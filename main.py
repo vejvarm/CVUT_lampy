@@ -1,21 +1,28 @@
+# TODO: plotting and short/long time averaging
 from matplotlib import pyplot as plt
 
-from preprocessing import mat2dict, calc_zscore, calc_psd, remove_noise
+from preprocessing import Preprocessor, complete_average
+from Aggregators import Average
 
 if __name__ == '__main__':
-    df = mat2dict('./data/neporuseno/03092018_AccM.mat')
-    print(df.keys())
-    fs = 512             # acquisition sampling frequency
-    ns_per_hz = 10       # desired number of samples per Hertz in FFT
+    path_list = ['./data/poruseno/']
+    # Preprocess files referenced by path_list
+    preproc1 = Preprocessor(noise_f_rem=(50, 100, 150, 200),
+                            noise_df_rem=(20, 1, 10, 1))  # refer to __init__ for possible preprocessing settings
+    preprocessed = preproc1.run(path_list)
+    print(preprocessed.keys())
+    freq_vals, psd_list, _, _ = preprocessed[list(preprocessed.keys())[0]]
+    acc1_psd = psd_list[0]
+    acc1_psd_avg = complete_average(acc1_psd)
 
-    acc1 = df['Acc1']
+    # using Aggregator
+    short_term_avg = Average(acc1_psd[:, 0])
+    for i in range(1, acc1_psd.shape[1]):
+        short_term_avg.update(acc1_psd[:, i])
 
-    acc1_zscore = calc_zscore(acc1)
-    freq_vals, acc1_psd = calc_psd(acc1_zscore, fs, ns_per_hz)
-
-    acc1_psd_denoised = remove_noise(acc1_psd, fs)
-
-    plt.plot(freq_vals, acc1_psd)
+#    plt.plot(freq_vals, acc1_psd_denoised[:, 0])
+    plt.plot(freq_vals, acc1_psd_avg)
+    plt.plot(freq_vals, short_term_avg.PSD)
     plt.xlabel('frequency (Hz)')
     plt.ylabel('PSD (Power Spectral Density)')
     plt.show()
