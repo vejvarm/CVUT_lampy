@@ -50,6 +50,6 @@ def animate(j):
     return line
 
 if __name__ == '__main__':
-    ani = animation.FuncAnimation(fig, animate, init_func=animate_init, interval=100, blit=True, save_count=50, repeat=True)
+    ani = animation.FuncAnimation(fig, animate, init_func=animate_init, frames=n_msrmnts, interval=100, blit=True, save_count=50, repeat=True)
 
     plt.show()

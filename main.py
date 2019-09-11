@@ -40,9 +40,6 @@ if __name__ == '__main__':
         ax[i].set_ylabel('PSD')
         ax[i].set_title(f'sloup {i//2 + 1} acc {i%2 + 1}')
 
-    # Wind speed
-    fig = plt.figure()
-    plt.plot()
 #    for value in averages_dict.values():
 #        plt.plot(freq_vals, value[0])
 
