@@ -77,7 +77,7 @@ class Preprocessor:
         """
 
         :param paths: (list/tuple) strings of paths leading to .mat files or folder with .mat files for loading
-        :return preprocessed: (List[2D ndarrays]) list of 2D preprocessed power spectral densities
+        :return preprocessed: (Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]]) dictionary of preprocessed files
         """
 
         preprocessed = dict()
@@ -163,7 +163,7 @@ class Preprocessor:
         """
 
         :param psd_arr: array of power spectral densities [nfft, :]
-        :return psd_arr_denoised:
+        :return psd_arr_denoised: unwanted parts are replaced by constant value from the value directly before the removal
         """
         psd_arr_denoised = deepcopy(psd_arr)
 
@@ -172,7 +172,7 @@ class Preprocessor:
         for fr, dfr in zip(self.noise_f_rem, self.noise_df_rem):
             fr_idx = int(self.ns_per_hz*fr)
             dfr_idx = int(self.ns_per_hz*dfr)
-            psd_arr_denoised[fr_idx-dfr_idx:fr_idx+dfr_idx+1] = 0
+            psd_arr_denoised[fr_idx-dfr_idx:fr_idx+dfr_idx+1] = psd_arr[fr_idx-dfr_idx-1]  # repeat the last valid value
 
         return psd_arr_denoised
 
@@ -191,13 +191,3 @@ class Preprocessor:
             psd_arr_cg[:, i] = np.convolve(psd_arr[:, i], filt, 'same')
 
         return psd_arr_cg
-
-
-def complete_average(psd_arr):
-    """
-    Calculate average power spectral density value for each frequency from all given measurements in psd_arr
-
-    :param psd_arr: array of power spectral densities [nfft, :]
-    :return psd_arr_avg: average power spectral density from all given measurements
-    """
-    return np.mean(psd_arr, axis=1)
