@@ -10,20 +10,33 @@ from Aggregators import Average, complete_average
 
 if __name__ == '__main__':
     path_list = [['./data/neporuseno/week'],
-                 ['./data/PovlakPrycSloup1OdleptaniSloup2Sloup3__2019_03_28___2019_07_01__vz/week']]
+                 ['./data/PovlakPrycSloup1OdleptaniSloup2Sloup3/week']]
     psd_day = 0
+
+    # preprocessing parameters (refer to Preprocessor __init__() for possible preprocessing settings):
+    ns_per_hz = 10
+    freq_range = (0, 256)
+    noise_f_rem = (2, 50, 100, 150, 200)
+    noise_df_rem = (2, 5, 2, 5, 2)
+    mov_filt_size = 10
+
+    # Aggregator parameters
+    psd_shape = ((freq_range[1] - freq_range[0])*ns_per_hz, )
+
     for path in path_list:
         averages_dict = dict()
         # Preprocess files referenced by path_list
-        preproc = Preprocessor(noise_f_rem=(2, 50, 100, 150, 200),
-                               noise_df_rem=(2, 5, 1, 5, 1),
-                               mov_filt_size=5)  # refer to __init__ for possible preprocessing settings
+        preproc = Preprocessor(ns_per_hz=ns_per_hz,
+                               freq_range=freq_range,
+                               noise_f_rem=noise_f_rem,
+                               noise_df_rem=noise_df_rem,
+                               mov_filt_size=mov_filt_size)
         preprocessed = preproc.run(path)
     #    print(preprocessed.keys())
     #    print(preprocessed['12102018_AccM'])
 
         num_accs = len(preprocessed[list(preprocessed.keys())[0]][1])
-        long_term_aggs = [Average() for _ in range(num_accs)]
+        long_term_aggs = [Average(shape=psd_shape) for _ in range(num_accs)]
         for key, value in preprocessed.items():
             freq_vals, psd_list, _, _ = value
             daily_avg = [[]] * len(psd_list)
@@ -39,7 +52,8 @@ if __name__ == '__main__':
         ax = ax.flatten()
         for i, agg in enumerate(long_term_aggs):
             fig.suptitle('LONG TERM AVERAGES (PSD)', fontsize=16)
-            ax[i].semilogy(freq_vals, agg.PSD)
+            ax[i].stem(freq_vals, agg.PSD, use_line_collection=True, markerfmt=" ")
+#            ax[i].set_yscale("log")
             ax[i].set_xlabel('frequency [Hz]')
             ax[i].set_ylabel('PSD')
             ax[i].set_title(f'sloup {i//2 + 1} acc {i%2 + 1}')
@@ -51,7 +65,8 @@ if __name__ == '__main__':
                 ax = ax.flatten()
                 fig.suptitle('SHORT TERM AVERAGES (psd)', fontsize=16)
                 for i, psd in enumerate(value):
-                    ax[i].semilogy(freq_vals, psd)
+                    ax[i].stem(freq_vals, psd, use_line_collection=True, markerfmt=" ")
+#                    ax[i].set_yscale("log")
                     ax[i].set_xlabel('frequency [Hz]')
                     ax[i].set_ylabel('psd')
                     ax[i].set_title(f'sloup {i // 2 + 1} acc {i % 2 + 1}')

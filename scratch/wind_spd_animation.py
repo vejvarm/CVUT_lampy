@@ -14,7 +14,7 @@ preproc = Preprocessor(noise_f_rem=(2, 50, 100, 150, 200),
                            mov_filt_size=5)  # refer to __init__ for possible preprocessing settings
 preprocessed = preproc.run(path_list)
 
-freqs, accs, wind_dir, wind_spd = preprocessed['09092018_AccM']
+freqs, accs, wind_dir, wind_spd = preprocessed[list(preprocessed.keys())[0]]
 wind_spd = wind_spd.flatten()
 
 # Animating data
