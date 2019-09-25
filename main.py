@@ -1,5 +1,6 @@
 # short/long time averaging
 # TODO: plotting
+
 import numpy as np
 
 from matplotlib import pyplot as plt
@@ -9,9 +10,10 @@ from Aggregators import Average, complete_average
 
 
 if __name__ == '__main__':
-    path_list = [['./data/neporuseno/week'],
-                 ['./data/PovlakPrycSloup1OdleptaniSloup2Sloup3/week']]
+    path_list = [['./data/neporuseno/2months'],
+                 ['./data/PovlakPrycSloup1OdleptaniSloup2Sloup3/2months']]
     psd_day = 0
+    y_scale = "log"
 
     # preprocessing parameters (refer to Preprocessor __init__() for possible preprocessing settings):
     ns_per_hz = 10
@@ -53,7 +55,7 @@ if __name__ == '__main__':
         for i, agg in enumerate(long_term_aggs):
             fig.suptitle('LONG TERM AVERAGES (PSD)', fontsize=16)
             ax[i].stem(freq_vals, agg.PSD, use_line_collection=True, markerfmt=" ")
-#            ax[i].set_yscale("log")
+            ax[i].set_yscale(y_scale)
             ax[i].set_xlabel('frequency [Hz]')
             ax[i].set_ylabel('PSD')
             ax[i].set_title(f'sloup {i//2 + 1} acc {i%2 + 1}')
@@ -66,7 +68,7 @@ if __name__ == '__main__':
                 fig.suptitle('SHORT TERM AVERAGES (psd)', fontsize=16)
                 for i, psd in enumerate(value):
                     ax[i].stem(freq_vals, psd, use_line_collection=True, markerfmt=" ")
-#                    ax[i].set_yscale("log")
+                    ax[i].set_yscale(y_scale)
                     ax[i].set_xlabel('frequency [Hz]')
                     ax[i].set_ylabel('psd')
                     ax[i].set_title(f'sloup {i // 2 + 1} acc {i % 2 + 1}')

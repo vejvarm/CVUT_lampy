@@ -4,7 +4,7 @@
 # odstranění druhé poloviny spektra (zrcadlově symetrické s první polovinou)
 # odstranění násobků 50 Hz (el.mag. rušení)
 # vyhladit plovoucím průměrem (coarse graining) --- průměr z okolních hodnot
-# TODO: odstranění trendů (0 - 50 Hz, 0 - 100 Hz)
+# odstranění trendů (0 - 50 Hz, 0 - 100 Hz)
 
 
 import os
@@ -12,6 +12,18 @@ from copy import deepcopy
 
 import numpy as np
 from scipy.io import loadmat
+from scipy.optimize import leastsq
+from tqdm import tqdm
+
+
+def _remove_negative(psd_arr):
+    """
+    Remove negative values from psd
+
+    :param psd_arr: array of power spectral densities [nfft, :]
+    :return: psd_arr_positive
+    """
+    return psd_arr.clip(min=0)
 
 
 class Preprocessor:
@@ -48,12 +60,15 @@ class Preprocessor:
                 # leads to folder ... load all .mat files from it
                 path_gen = os.walk(path)
                 for p, sub, files in path_gen:
-                    for file in files:
-                        f_name, f_ext = os.path.splitext(file)
-                        if f_ext == '.mat':
-                            fullpath = os.path.join(p, file)
-                            freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath)
-                            preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
+                    with tqdm(desc=f"Processing files in folder {p}", total=len(files), unit="file") as pbar:
+                        for file in files:
+                            f_name, f_ext = os.path.splitext(file)
+                            if f_ext == '.mat':
+                                fullpath = os.path.join(p, file)
+                                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath)
+                                preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
+                            pbar.update(1)
+
             elif os.path.splitext(path)[-1] == '.mat':
                 # leads to .mat file ... load directly
                 freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path)
@@ -109,6 +124,8 @@ class Preprocessor:
 #            psd = (psd - psd.min())/(psd.max() - psd.min())
             psd = (psd - psd_mean)/psd_std
 #            print(np.mean(psd), np.var(psd), psd.max())
+            # remove trend
+            psd = self._detrend(freq_vals[i], psd)
             # remove negative values
             psd = self._remove_negative(psd)
             # remove everything lower than mode:
@@ -249,3 +266,37 @@ class Preprocessor:
         mode = hist[1][int(np.argmax(hist[0]))]
 
         return psd_arr.clip(min=mode)
+
+    def _detrend(self, freqs, psd_arr):
+        """
+        Remove linear trend from y=psd_arr(x) based on Least Squares optimized curve fitting
+
+        :param freqs: x
+        :param psd_arr: y
+        :return: psd_arr_detrended
+        """
+        nfs, nms = psd_arr.shape
+        psd_arr_detrended = np.zeros((nfs, nms))
+        min_idx, max_idx = (int(self.ns_per_hz*f) for f in self.freq_range)
+
+        for i in range(nms):
+            par_init = (1., )
+
+            x = freqs[min_idx:max_idx]
+            y = psd_arr[min_idx:max_idx, i]
+
+            par, success = leastsq(self.__error_func, par_init, args=(x, y, self.__linear_func))
+
+            y_trend = self.__linear_func(par, x)
+
+            psd_arr_detrended[:, i] = np.concatenate((psd_arr[:min_idx, i], y - y_trend, psd_arr[max_idx:, i]))
+
+        return psd_arr_detrended
+
+    @staticmethod
+    def __error_func(par, x, y, func):
+        return np.square(y - func(par, x))
+
+    @staticmethod
+    def __linear_func(par, x):
+        return np.sum(par[i]*x**i for i in range(len(par)))
