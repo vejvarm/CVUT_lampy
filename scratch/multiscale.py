@@ -47,32 +47,15 @@ if __name__ == "__main__":
 #    nmeas = 144
 #    psd_array = np.arange(nfreqs*nmeas).reshape((nfreqs, nmeas))
 
-    # Preprocessor config
-    ns_per_hz = 10
-    freq_range = (0, 256)
-    noise_f_rem = (2, 50, 100, 150, 200)
-    noise_df_rem = (2, 5, 2, 5, 2)
-    mov_filt_size = 10
-
-    preproc = Preprocessor(ns_per_hz=ns_per_hz,
-                           freq_range=freq_range,
-                           noise_f_rem=noise_f_rem,
-                           noise_df_rem=noise_df_rem,
-                           mov_filt_size=mov_filt_size)
-
+    path = ["../data/neporuseno/week/"]
 #    filename = "08072018_AccM"
 #    path = ['../data/neporuseno/2months/' + filename + ".mat"]
 
-    path = ["../data/neporuseno/week/"]
+    # load path and preprocess with default config
+    preprocessor = Preprocessor()
+    freqs, psd_stacked = preprocessor.run(path, return_as='ndarray')
 
-    preprocessed = preproc.run(path)
-
-    for key, (freqs, psd_list, _, _) in preprocessed.items():
-        psd_array = np.array(psd_list)
-        if 'psd_stacked' in locals():
-            psd_stacked = np.concatenate((np.expand_dims(psd_array, 0), psd_stacked))
-        else:
-            psd_stacked = np.expand_dims(psd_array, 0)
+    ns_per_hz = preprocessor.get_config_values()[1]
 
     # average through the days
     psd_average = np.mean(psd_stacked, axis=0)

@@ -28,7 +28,13 @@ def _remove_negative(psd_arr):
 
 class Preprocessor:
 
-    def __init__(self, fs=512, ns_per_hz=10, freq_range=(0, 256), noise_f_rem=tuple(range(50, 251, 50)), noise_df_rem=(5, )*5, mov_filt_size=5):
+    def __init__(self,
+                 fs=512,
+                 ns_per_hz=10,
+                 freq_range=(0, 256),
+                 noise_f_rem=(2, 50, 100, 150, 200),
+                 noise_df_rem=(2, 5, 2, 5, 2),
+                 mov_filt_size=10):
         """
 
         :param fs: (int) sampling frequency of the acquisition
@@ -45,10 +51,14 @@ class Preprocessor:
         self.noise_df_rem = noise_df_rem
         self.mov_filt_size = mov_filt_size
 
-    def run(self, paths):
+    def get_config_values(self):
+        return tuple(self.__dict__.values())
+
+    def run(self, paths, return_as='dict'):
         """
 
         :param paths: (list/tuple) strings of paths leading to .mat files or folder with .mat files for loading
+        :param return_as: (string) if 'dict', returns a dictionary, if 'ndarray' returns an ndarray of only psd
         :return preprocessed: (Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]]) dictionary of preprocessed files
         """
 
@@ -78,10 +88,18 @@ class Preprocessor:
                 print("Given path doesn't refer to .mat file or folder with .mat files. \n Ignoring path.")
                 continue
 
-        return preprocessed
-
-    # TODO: load all files from paths into dicts
-    # TODO: preprocess each dict sepparately or all into one?
+        if return_as == 'dict':
+            return preprocessed
+        elif return_as == 'ndarray':
+            for key, (freqs, psd_list, _, _) in preprocessed.items():
+                psd_array = np.array(psd_list)
+                if 'psd_stacked' in locals():
+                    psd_stacked = np.concatenate((np.expand_dims(psd_array, 0), psd_stacked))
+                else:
+                    psd_stacked = np.expand_dims(psd_array, 0)
+            return freqs, psd_stacked
+        else:
+            raise AttributeError("return_as should be either 'dict' or 'ndarray'")
 
     def _preprocess(self, fullpath2file):
         """ run the preprocessing pipeline
