@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from preprocessing import Preprocessor
-from helpers import find_top_peaks, calc_centre_of_mass
+# from helpers import find_top_peaks, calc_centre_of_mass
 
 
 if __name__ == '__main__':

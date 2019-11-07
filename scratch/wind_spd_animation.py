@@ -57,7 +57,7 @@ def animate_init():
     ax[-1].set_ylim(-0.2, np.max(wind_spd))
     return line
 
-def animate(j):
+def animate(j, ):
     for i in range(n_accs):
         line[i].set_ydata(accs[i][:, j])
 #    line[-1].set_ydata(np.hstack((wind_spd[:j], [np.nan]*(n_msrmnts - j))))
@@ -66,7 +66,7 @@ def animate(j):
     return line
 
 if __name__ == '__main__':
-    ani = animation.FuncAnimation(fig, animate, init_func=animate_init, frames=n_msrmnts, interval=200,
+    ani = animation.FuncAnimation(fig, animate, init_func=animate_init, fargs=None, frames=n_msrmnts, interval=200,
                                   blit=True, save_count=50, repeat=True)
 
     plt.show()

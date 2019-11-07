@@ -59,7 +59,9 @@ class Preprocessor:
 
         :param paths: (list/tuple) strings of paths leading to .mat files or folder with .mat files for loading
         :param return_as: (string) if 'dict', returns a dictionary, if 'ndarray' returns an ndarray of only psd
-        :return preprocessed: (Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]]) dictionary of preprocessed files
+        :return preprocessed:
+            if return_as == 'dict': Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]] dict of preprocessed files
+            if return_as == 'ndarray': Tuple[1Darray[nfft/2, ], 4Darray[nfiles, naccs, nfft/2, nmeas]]
         """
 
         preprocessed = dict()
@@ -70,8 +72,9 @@ class Preprocessor:
                 # leads to folder ... load all .mat files from it
                 path_gen = os.walk(path)
                 for p, sub, files in path_gen:
-                    with tqdm(desc=f"Processing files in folder {p}", total=len(files), unit="file") as pbar:
-                        for file in files:
+                    mat_files = [file for file in files if os.path.splitext(file)[-1] == ".mat"]
+                    with tqdm(desc=f"Processing files in folder {p}", total=len(mat_files), unit="file") as pbar:
+                        for file in mat_files:
                             f_name, f_ext = os.path.splitext(file)
                             if f_ext == '.mat':
                                 fullpath = os.path.join(p, file)

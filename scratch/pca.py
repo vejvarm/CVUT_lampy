@@ -62,8 +62,8 @@ def reduce_to_2D(data):
 
 if __name__ == '__main__':
     path_list = None
-    data_new = load_and_standardize(['data/neporuseno/2months'])
-    data_old = load_and_standardize(['data/PovlakPrycSloup1OdleptaniSloup2Sloup3/2months'])
+    data_new = load_and_standardize(['../data/neporuseno/2months'])
+    data_old = load_and_standardize(['../data/poruseno/2months'])
 
     plot_explained_variance(data_new)
     plot_explained_variance(data_old)
