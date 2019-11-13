@@ -1,4 +1,6 @@
 # Method 1 (Finding centres of mass in PSD and then comparing them)
+import os
+
 import numpy as np
 
 from os import path
@@ -23,9 +25,14 @@ class Method:
 
         :param path: (string) path to files with data
         """
-        path_to_freqs = path + "/freqs.npy"
-        path_to_PSD = path + "/PSD.npy"
-        path_to_vars = path + "/PSDvar.npy"
+        if ".npy" in os.path.splitext(path)[-1]:
+            folder_path = os.path.split(path)[0]
+        else:
+            folder_path = path
+        path_to_freqs = folder_path + "/freqs.npy"
+        path_to_PSD = folder_path + "/PSD.npy"
+        path_to_vars = folder_path + "/PSDvar.npy"
+
         try:
             if self.from_existing_file:
                 freqs = np.load(path_to_freqs)
@@ -38,8 +45,8 @@ class Method:
             freqs, psd = self.preprocessor.run([path], return_as="ndarray")
 
             # calculate PSD (== long term average values of psd)
-            mean = psd.mean(axis=(0, 3))
-            var = psd.var(axis=(0, 3))
+            mean = np.nanmean(psd, axis=(0, 3))
+            var = np.nanvar(psd, axis=(0, 3))
 
             # save freqs and PSD files
             np.save(path_to_freqs, freqs)
@@ -262,12 +269,13 @@ class M2(Method):
 if __name__ == '__main__':
     dataset = ["neporuseno", "neporuseno2", "poruseno"]
     period = "2months"  # week or 2months
-    paths = [f"./data/{d}/{period}" for d in dataset]
+    filename = "psd_array_excited.npy"
+    paths = [f"./data/{d}/{period}/{filename}" for d in dataset]
 
     preprocessor = Preprocessor(noise_df_rem=(2, 5, 0, 0, 0))
 
-    from_existing_file = True
-    var_scaled_PSD = True
+    from_existing_file = False
+    var_scaled_PSD = False
 
     # METHOD 1 ---------------------------------------------------------------------------------------------------------
     # find peaks and learn centres of mass of neporuseno
@@ -296,9 +304,9 @@ if __name__ == '__main__':
     m2 = M2(var_scaled_PSD=var_scaled_PSD)
 
     # multiscale params
-    bin_sizes = (20, 40)
-    tresholds = (0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.50, 1.)
-    plot_distributions = False
+    bin_sizes = (10, )
+    tresholds = (0.20, )
+    plot_distributions = True
 
     distributions_1 = m2.get_multiscale_distributions(paths[0], bin_sizes=bin_sizes, thresholds=tresholds)
     distributions_2 = m2.get_multiscale_distributions(paths[1], bin_sizes=bin_sizes, thresholds=tresholds)

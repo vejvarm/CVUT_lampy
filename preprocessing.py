@@ -66,6 +66,16 @@ class Preprocessor:
 
         preprocessed = dict()
 
+        # for .npy file path!
+        if ".npy" in os.path.splitext(paths[0])[-1]:
+            # leads to .npy file ... load directly
+            folder_path = os.path.split(paths[0])[0]
+            freqs = np.load(folder_path + "/freqs.npy")
+            psd_stacked = np.load(paths[0])
+            print(".npy path specified. Loading and returning only first file from paths!")
+            return freqs, psd_stacked
+
+        # for .mat or folder paths
         for path in paths:
             path = os.path.normpath(path)  # normalize the path structure
             if os.path.isdir(path):
@@ -81,7 +91,6 @@ class Preprocessor:
                                 freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath)
                                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
                             pbar.update(1)
-
             elif os.path.splitext(path)[-1] == '.mat':
                 # leads to .mat file ... load directly
                 freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path)
