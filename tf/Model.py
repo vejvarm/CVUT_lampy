@@ -1,78 +1,19 @@
+import os
+
 import numpy as np
 import tensorflow as tf
 
+from datetime import datetime
+
 from tensorflow.keras import Model, Sequential
-from tensorflow.keras.layers import Layer, Conv1D, Dense, Softmax, Flatten, Dropout
+from tensorflow.keras.layers import InputLayer, Layer, Conv1D, Dense, Softmax, Flatten, Dropout, BatchNormalization
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
+from tensorflow.keras.callbacks import EarlyStopping, TensorBoard, ModelCheckpoint, ReduceLROnPlateau
 
-class ConvDropout(Layer):
-
-    def __init__(self,
-                 filters,
-                 kernel_size,
-                 strides=1,
-                 padding='valid',
-                 data_format='channels_last',
-                 dilation_rate=1,
-                 activation=None,
-                 use_bias=True,
-                 kernel_initializer='glorot_uniform',
-                 bias_initializer='zeros',
-                 kernel_regularizer=None,
-                 bias_regularizer=None,
-                 activity_regularizer=None,
-                 kernel_constraint=None,
-                 bias_constraint=None,
-                 drop_rate=0.0,
-                 **kwargs):
-        super(ConvDropout, self).__init__()
-
-        self.conv = Conv1D(filters, kernel_size, strides, padding, data_format, dilation_rate, activation,
-                           use_bias, kernel_initializer, bias_initializer, kernel_regularizer, bias_regularizer,
-                           activity_regularizer, kernel_constraint, bias_constraint, **kwargs)
-        self.drop = Dropout(drop_rate)
-
-    def call(self, inputs, training=False):
-        x = self.conv(inputs)
-        if training:
-            x = self.drop(x)
-        return x
-
-
-class CNNModel(Model):
-    # 1D deep CNN model
-    def __init__(self, nfilters, kernel_size, strides=1, padding="valid",
-                 dilation_rate=1, activation="relu", nclasses=2, drop_rate=0.1):
-        super(CNNModel, self).__init__()
-
-        self.nclasses = nclasses
-        self.nlayers = len(nfilters)
-        self.dlayers = dict()
-
-        self.conv_drop = list()
-
-        for i in range(self.nlayers):
-            self.conv_drop.append(ConvDropout(nfilters[i], kernel_size=kernel_size, strides=strides, padding=padding,
-                                              data_format="channels_last", dilation_rate=dilation_rate,
-                                              activation=activation, drop_rate=drop_rate))
-
-        # flatten to two dimensions
-        self.flatten = Flatten()
-
-        # FF Softmax layer
-        self.out = Dense(self.nclasses, activation='softmax')
-
-    def call(self, x, training=False):
-        # Apply Conv layers with dropout
-        for i in range(self.nlayers):
-            # noinspection PyCallingNonCallable
-            x = self.conv_drop[i](x)
-        # Flatten conv output
-        x = self.flatten(x)
-        # Apply FF layer with softmax
-        return self.out(x)
+# global settings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.keras.backend.set_floatx('float64')
 
 
 def prepare_dataset(ds, ndata, batch_size, nclasses):
@@ -84,7 +25,7 @@ def prepare_dataset(ds, ndata, batch_size, nclasses):
 
 
 def load_dataset(paths):
-    # load first part of data (is has shape (ndata, nfft/2, naccs)
+    # load first part of data (it has shape (ndata, nfft/2, naccs)
     X = np.load(paths[0] + "/X.npy")
     y = np.load(paths[0] + "/y.npy")
     ds = tf.data.Dataset.from_tensor_slices((X, y))
@@ -97,7 +38,39 @@ def load_dataset(paths):
         ndata += X.shape[0]
         ds = ds.concatenate(tf.data.Dataset.from_tensor_slices((X, y)))
 
-    return ndata, ds
+    data_shape = (ndata, X.shape[1], X.shape[2])
+
+    return data_shape, ds
+
+
+def build_model(input_shape, nfilters, kernel_sizes, strides, drop_rates, activation="relu", nclasses=2,
+                loss=CategoricalCrossentropy(), optimizer=Adam(), metrics=("accuracy", )):
+
+    # initialize sequetial model
+    model = Sequential()
+
+    # define input shapes
+    model.add(InputLayer(input_shape=input_shape))
+
+    # add convolutional layers with activation and dropout
+    for f, k, s, d in zip(nfilters, kernel_sizes, strides, drop_rates):
+        model.add(Conv1D(f, k, s, activation=activation))
+        model.add(Dropout(d))
+
+    # flatten the conv outputs
+    model.add(Flatten())
+
+    # add final Dense layer with softmax
+    model.add(Dense(nclasses, activation='softmax'))
+
+    # define loss, optimizer and calculated metrics and compile the model
+    model.compile(loss=loss,
+                  optimizer=optimizer,
+                  metrics=metrics)
+
+    return model
+
+
 
 # TODO: Implement GridSearchCV
 
@@ -105,31 +78,31 @@ def load_dataset(paths):
 if __name__ == '__main__':
     # PARAMS
     nclasses = 2
-    nepochs = 100
-    batch_size = 64
+    nepochs = 50
+    batch_size = 32
+    init_lr = 0.001
+    min_lr = 0.0000001
 
     # CONV layers
-    nfilters = [8, 16, 32, 64]
-    kernel_size = 16
-    strides = 2
-    drop_rate = 0.1
+    nfilters = [8, 8, 8, 8, 8]
+    kernel_sizes = [8]*len(nfilters)
+    strides = [2]*len(nfilters)
+    bn = False
+    drop_rates = [0.1]*len(nfilters)
 
-    nfft = 2560
-    naccs = 2
-
-    # TensorBoard
-    log_dir = "..\\results\\models\\tb\\logs"
+    # LOGGING
+    timestamp = datetime.strftime(datetime.now(), "%Y-%m-%d_%H-%M")
+    root = "D:\\!private\\Lord\\Git\\CVUT_lampy"
+    result_dir = f"{root}\\results\\models\\{timestamp}\\"
+    log_dir = f"{result_dir}\\logs"
 
     # PREPARE TRAINING DATA ---------------------------------------
-    tf.keras.backend.set_floatx('float64')
-
-    root = "D:/!private/Lord/Git/CVUT_lampy"
     folder = "trening"
     dataset = ["neporuseno", "neporuseno2", "poruseno"]
     period = "2months"  # week or 2months
     paths = [f"{root}/data/{folder}/{d}/{period}" for d in dataset]
 
-    ndata_train, ds_train = load_dataset(paths)  # load training dataset
+    (ndata_train, nfft, naccs), ds_train = load_dataset(paths)  # load training dataset
     ds_train = prepare_dataset(ds_train, ndata_train, batch_size, nclasses)  # prepare dataset object for training
     # -----------------------------------------------------
 
@@ -138,40 +111,43 @@ if __name__ == '__main__':
     dataset = ["neporuseno", "poruseno"]
     paths = [f"{root}/data/{folder}/{d}" for d in dataset]
 
-    ndata_valid, ds_valid = load_dataset(paths)  # load validation dataset
+    (ndata_valid, _, _), ds_valid = load_dataset(paths)  # load validation dataset
     ds_valid = prepare_dataset(ds_valid, ndata_valid, batch_size, nclasses)  # prepare dataset object for validation
 
     # -----------------------------------------------------
 
     # MODEL ------------------------------------------------
-    # instantiate model
-    model = CNNModel(nfilters, kernel_size, strides, nclasses=nclasses, drop_rate=drop_rate)
-
+    # define loss, optimizer and metrics
     loss = CategoricalCrossentropy()  # define cross entropy loss
-    optimizer = Adam()  # define optimizer
+    optimizer = Adam(learning_rate=init_lr, amsgrad=True)  # define optimizer
+    metrics = ["accuracy"]
 
-    # compile model
-    model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
-
-    # build model for summary
-    model.build((ndata_train, nfft, naccs))
+    # build and compile the model
+    model = build_model((nfft, naccs), nfilters, kernel_sizes, strides, drop_rates, nclasses=nclasses,
+                        loss=loss, optimizer=optimizer, metrics=metrics)
 
     model.summary()
+
+    # save model architecture for future loading
+    model.save(result_dir+"model")
 
     # TODO: GRID SEARCH
 
     # define callbacks
-    early_stopping = EarlyStopping("accuracy", patience=10, mode="max")
+    reduce_lr = ReduceLROnPlateau(monitor="val_accuracy", min_lr=min_lr)
+    early_stopping = EarlyStopping("accuracy", patience=5, mode="max")
+    checkpoint = ModelCheckpoint(filepath=result_dir+"checkpoint-{epoch:04d}.ckpt", monitor="val_accuracy",
+                                 save_best_only=True, save_weights_only=True, mode="max")
     tensor_board = TensorBoard(log_dir=log_dir)
 
     # train model
     model.fit(ds_train,
               epochs=nepochs,
               steps_per_epoch=ndata_train//batch_size + 1,
-              verbose=1,
+              verbose=2,
               validation_data=ds_valid,
               validation_steps=ndata_valid//batch_size + 1,
-              callbacks=[early_stopping, tensor_board])
+              callbacks=[reduce_lr, early_stopping, checkpoint, tensor_board])
 
-    # save model and it's trained weights
-    tf.keras.models.save_model(model, f"{root}/results/models")
+    # save model and it's trained weights (saved using callbacks)
+#    tf.keras.models.save_model(model, f"{root}/results/models")

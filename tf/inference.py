@@ -1,29 +1,36 @@
 import numpy as np
 import tensorflow as tf
 
-from tf.Model import prepare_dataset
+from tf.Model import load_dataset, prepare_dataset
 
 if __name__ == '__main__':
-    path_to_model = "d:/!private/Lord/Git/CVUT_lampy/results/models/08340acc/"
-    model = tf.keras.models.load_model(path_to_model)
+    path_to_folder = "d:/!private/Lord/Git/CVUT_lampy/results/models/2019-11-17_00-20/"
+    checkpoint = tf.train.latest_checkpoint(path_to_folder)
 
-    batch_size = 100
+    # load model architecture (with last trained weights)
+    model = tf.keras.models.load_model(path_to_folder+"model/")
 
-    state = "neporuseno"
-    validation_path = f"d:/!private/Lord/Git/CVUT_lampy/data/validace/{state}/"
+    # load desired weights from specified checkpoint
+    model.load_weights(checkpoint)
 
-    X = np.load(validation_path+"X.npy")
-    y = np.load(validation_path+"y.npy")
+    batch_size = 256
 
-    ndata, nfft, nacc = X.shape
+    states = ["neporuseno", "poruseno"]
+    for state in states:
+        validation_path = f"d:/!private/Lord/Git/CVUT_lampy/data/validace/{state}/"
 
-    ds = tf.data.Dataset.from_tensor_slices((X, y))
+        X = np.load(validation_path+"X.npy")
+        y = np.load(validation_path+"y.npy")
 
-    ds = prepare_dataset(ds, ndata=ndata, batch_size=batch_size, nclasses=2)
+        (ndata, nfft, nacc), ds = load_dataset([validation_path])
+        ds = prepare_dataset(ds, ndata=ndata, batch_size=batch_size, nclasses=2)
 
-    predictions = model.predict(X, batch_size=batch_size)
+        predictions = model.predict(X, batch_size=batch_size)
 
-    loss, accuracy = model.evaluate(ds, verbose=0, steps=ndata//batch_size+1)
+        loss, accuracy = model.evaluate(ds, verbose=0, steps=ndata//batch_size+1)
 
-    print(f"loss: {loss} \naccuracy: {accuracy}")
+        print(f"{state}\nloss: {loss:.4f} \naccuracy: {accuracy*100:.2f} %")
+
+    model.build((ndata, nfft, nacc))
+    model.summary()
 
