@@ -11,8 +11,11 @@ import os
 from copy import deepcopy
 
 import numpy as np
+
+from matplotlib import pyplot as plt
 from scipy.io import loadmat
 from scipy.optimize import leastsq
+from scipy.linalg import hankel
 from tqdm import tqdm
 
 
@@ -54,7 +57,7 @@ class Preprocessor:
     def get_config_values(self):
         return tuple(self.__dict__.values())
 
-    def run(self, paths, return_as='dict'):
+    def run(self, paths, return_as='dict', plot_semiresults=False):
         """
 
         :param paths: (list/tuple) strings of paths leading to .mat files or folder with .mat files for loading
@@ -88,12 +91,12 @@ class Preprocessor:
                             f_name, f_ext = os.path.splitext(file)
                             if f_ext == '.mat':
                                 fullpath = os.path.join(p, file)
-                                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath)
+                                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath, plot_semiresults)
                                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
                             pbar.update(1)
             elif os.path.splitext(path)[-1] == '.mat':
                 # leads to .mat file ... load directly
-                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path)
+                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path, plot_semiresults)
                 f_name = os.path.splitext(os.path.basename(path))[0]
                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
             else:
@@ -113,7 +116,7 @@ class Preprocessor:
         else:
             raise AttributeError("return_as should be either 'dict' or 'ndarray'")
 
-    def _preprocess(self, fullpath2file):
+    def _preprocess(self, fullpath2file, plot_semiresults=False):
         """ run the preprocessing pipeline
 
         :param fullpath2file: full path to .mat file that should be preprocessed
@@ -125,39 +128,68 @@ class Preprocessor:
         """
         df = self._mat2dict(fullpath2file)
 
-        acc = [[]]*6
-        freq_vals = [[]]*len(acc)
-        psd_list = [[]]*len(acc)
+        naccs = 6
+        freq_vals = [[]]*naccs
+        psd_list = [[]]*naccs
 
-        acc[0] = df['Acc1']
-        acc[1] = df['Acc2']
-        acc[2] = df['Acc3']
-        acc[3] = df['Acc4']
-        acc[4] = df['Acc5']
-        acc[5] = df['Acc6']
+        acc = [df[f'Acc{i}'] for i in range(1, naccs + 1)]
+
+#        acc[0] = df['Acc1']
+#        acc[1] = df['Acc2']
+#        acc[2] = df['Acc3']
+#        acc[3] = df['Acc4']
+#        acc[4] = df['Acc5']
+#        acc[5] = df['Acc6']
 
         # check if self.fs fits to value of 'FrekvenceSignalu'
         assert df['FrekvenceSignalu'] == self.fs, f"Value of 'FrekvenceSignalu' in {fullpath2file} doesn't correspond with self.fs ({self.fs} Hz)"
 
         for i, a in enumerate(acc):
-            # normalize 'a' to 0 mean and 1 variance
+
+            nvals, nmeas = a.shape
+            nops = 8  # number of preprocessing operations (for plotting)
+            time = np.arange(nvals) / self.fs
+
+            # initialize plot if 'plot_semiresults' == True
+            if plot_semiresults:
+                fig, ax = plt.subplots(nops+1, 1)
+            else:
+                ax = [None]*(nops+1)
+
+            self.conditional_plot(time, a.mean(axis=1), ax[0], plot_semiresults, xlabel='time (s)', ylabel='μ(a)', title='raw acceleration (acc)')
+
+            # normalize 'a' to mean==0 and variance==1
             a = self._calc_zscore(a)
+            self.conditional_plot(time, a.mean(axis=1), ax[1], plot_semiresults, xlabel='time (s)', ylabel='μ(a)', title='normalized acc')
+
+            # calculate autocorrelation function to reduce noise
+            a = self._autocorr(a)
+            self.conditional_plot(time[:-1], a.mean(axis=1), ax[2], plot_semiresults, xlabel='time (s)', ylabel='ρxx', title='autocorrelation of acc')
+
             # calculate frequency values and power spectral density (psd) of 'a'
             freq_vals[i], psd = self._calc_psd(a)
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[3], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='Power spectral density (psd)')
+
             # remove noise based on values in self.noise_f_rem and self.noise_df_rem
-            psd = self._remove_noise(psd, replace_with="zero")
+            psd = self._remove_noise(psd, replace_with="min")
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[4], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='psd without *50Hz')
+
             # use moving average to smooth out the spectrum and remove noise
             psd = self._coarse_grain(psd)
-            # normalize to 0 mean and 1 var
-            psd_mean = np.mean(psd)
-            psd_std = np.std(psd)
-#            psd = (psd - psd.min())/(psd.max() - psd.min())
-            psd = (psd - psd_mean)/psd_std
-#            print(np.mean(psd), np.var(psd), psd.max())
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[5], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='coarse grained psd')
+
+            # normalize 'psd' to mean==0 and variance==1
+            psd = (psd - psd.mean())/psd.std()
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[6], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='normalized psd')
+
             # remove trend
             psd = self._detrend(freq_vals[i], psd)
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[7], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='detrended psd')
+
             # remove negative values
             psd = self._remove_negative(psd)
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[8], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='nonnegative psd')
+
             # remove everything lower than mode:
 #            psd = self._remove_below_mode(psd)
             # save to list of psd for each acceleration sensor output
@@ -171,6 +203,15 @@ class Preprocessor:
         wind_spd = df['WindSpeed'] if 'WindSpeed' in df.keys() else None
 
         return freq_vals[0], psd_list, wind_dir, wind_spd
+
+    @staticmethod
+    def conditional_plot(x, y, ax=None, cond=False, xlabel='x', ylabel='y', title=''):
+        """ Plots 'x' and 'y' to 'ax' as a line plot if 'cond' == True """
+        if cond:
+            ax.plot(x, y)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+            ax.set_title(title)
 
     @staticmethod
     def _mat2dict(path):
@@ -198,6 +239,21 @@ class Preprocessor:
         """
         assert len(arr.shape) == 2, "arr must be 2D array of [time samples, number of measurements]"
         return (arr - np.mean(arr, 0)) / np.std(arr, 0)
+
+    @staticmethod
+    def _autocorr(arr):
+        """ calculate autocorrelation function from the array (arr) to reduce noise """
+        N = arr.shape[0]  # počet vzorků signálu
+        nmeas = arr.shape[1]  # počet měření
+
+        Rrr = np.zeros((N-1, nmeas))
+
+        for i in range(nmeas):
+            a = arr[:, i]
+            XX = hankel(a[1:])  # vytvoření hankelovy matice z prvků a[1] až a[N-1] (horní levá trojúhelníková matice)
+            vX = a[:-1]  # vektor a[0] až a[N-2]
+            Rrr[:, i] = np.matmul(XX, vX) / N - a.mean() ** 2  # výpočet normalizované ACF
+        return Rrr
 
     @staticmethod
     def _hamming(arr):
@@ -329,4 +385,13 @@ class Preprocessor:
 
     @staticmethod
     def __linear_func(par, x):
-        return np.sum(par[i]*x**i for i in range(len(par)))
+        return sum(par[i]*x**i for i in range(len(par)))
+
+
+if __name__ == '__main__':
+
+    plot_semiresults = True
+
+    p = Preprocessor()
+
+    freqs, psd = p.run(["./data/validace/neporuseno/10112018_AccM.mat"], return_as="ndarray", plot_semiresults=plot_semiresults)
