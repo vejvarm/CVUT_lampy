@@ -57,11 +57,13 @@ class Preprocessor:
     def get_config_values(self):
         return tuple(self.__dict__.values())
 
-    def run(self, paths, return_as='dict', plot_semiresults=False):
+    def run(self, paths, return_as='dict', plot_semiresults=False, nmeas=None):
         """
 
         :param paths: (list/tuple) strings of paths leading to .mat files or folder with .mat files for loading
         :param return_as: (string) if 'dict', returns a dictionary, if 'ndarray' returns an ndarray of only psd
+        :param plot_semiresults: if True, make a plot after each preprocessing operation
+        :param nmeas: if None, take all measurements available in file, if (int), take first nmeas measurements
         :return preprocessed:
             if return_as == 'dict': Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]] dict of preprocessed files
             if return_as == 'ndarray': Tuple[1Darray[nfft/2, ], 4Darray[nfiles, naccs, nfft/2, nmeas]]
@@ -91,12 +93,12 @@ class Preprocessor:
                             f_name, f_ext = os.path.splitext(file)
                             if f_ext == '.mat':
                                 fullpath = os.path.join(p, file)
-                                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath, plot_semiresults)
+                                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath, plot_semiresults, nmeas)
                                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
                             pbar.update(1)
             elif os.path.splitext(path)[-1] == '.mat':
                 # leads to .mat file ... load directly
-                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path, plot_semiresults)
+                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path, plot_semiresults, nmeas)
                 f_name = os.path.splitext(os.path.basename(path))[0]
                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
             else:
@@ -116,10 +118,12 @@ class Preprocessor:
         else:
             raise AttributeError("return_as should be either 'dict' or 'ndarray'")
 
-    def _preprocess(self, fullpath2file, plot_semiresults=False):
+    def _preprocess(self, fullpath2file, plot_semiresults=False, nmeas=None):
         """ run the preprocessing pipeline
 
         :param fullpath2file: full path to .mat file that should be preprocessed
+        :param plot_semiresults: if True, make a plot after each preprocessing operation
+        :param nmeas: if None, take all measurements available in file, if (int), take first nmeas measurements
         :return:
             :var freq_vals:  (1D ndarray) frequency values (x axis) [fs*ns_per_hz//2],
             :var psd_list: (List[2D ndarray]) preprocessed power spectral densities [self.nfft, number of measurements]
@@ -134,12 +138,9 @@ class Preprocessor:
 
         acc = [df[f'Acc{i}'] for i in range(1, naccs + 1)]
 
-#        acc[0] = df['Acc1']
-#        acc[1] = df['Acc2']
-#        acc[2] = df['Acc3']
-#        acc[3] = df['Acc4']
-#        acc[4] = df['Acc5']
-#        acc[5] = df['Acc6']
+        if nmeas:
+            for i in range(naccs):
+                acc[i] = acc[i][:, :nmeas]
 
         # check if self.fs fits to value of 'FrekvenceSignalu'
         assert df['FrekvenceSignalu'] == self.fs, f"Value of 'FrekvenceSignalu' in {fullpath2file} doesn't correspond with self.fs ({self.fs} Hz)"
@@ -391,7 +392,9 @@ class Preprocessor:
 if __name__ == '__main__':
 
     plot_semiresults = True
+    nmeas = 5
 
     p = Preprocessor()
 
-    freqs, psd = p.run(["./data/validace/neporuseno/10112018_AccM.mat"], return_as="ndarray", plot_semiresults=plot_semiresults)
+    freqs, psd = p.run(["./data/trening/poruseno/2months/06202019_Acc.mat"], return_as="ndarray",
+                       plot_semiresults=plot_semiresults, nmeas=nmeas)
