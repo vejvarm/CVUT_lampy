@@ -34,7 +34,17 @@ class Method:
         path_to_vars = folder_path + "/PSDvar.npy"
 
         try:
-            if self.from_existing_file:
+            if self.from_existing_file and "X.npy" in path:
+                nlamps = 3
+                freqs, X = self.preprocessor.run([path], return_as="ndarray")
+
+                X = np.split(X, nlamps, axis=0)  # reshape from (ndays.nmeas.nlamps, nfft//2, naccs//nlamps)
+                X = np.dstack(X)                 # to (ndays.nmeas, nfft//2, naccs)
+                psd = X.transpose((2, 1, 0))     # and then to (naccs, nfft//2, ndays.nmeas)
+
+                mean = psd.mean(axis=2)
+                var = psd.var(axis=2)
+            elif self.from_existing_file:
                 freqs = np.load(path_to_freqs)
                 mean = np.load(path_to_PSD)
                 var = np.load(path_to_vars)
@@ -267,21 +277,22 @@ class M2(Method):
 
 
 if __name__ == '__main__':
+    folder = "trening"
     dataset = ["neporuseno", "neporuseno2", "poruseno"]
     period = "2months"  # week or 2months
-    filename = "psd_array_excited.npy"
-    paths = [f"./data/{d}/{period}/{filename}" for d in dataset]
+    filename = "X.npy"
+    paths = [f"./data/{folder}/{d}/{period}/{filename}" for d in dataset]
 
-    preprocessor = Preprocessor(noise_df_rem=(2, 5, 0, 0, 0))
+    preprocessor = Preprocessor()
 
-    from_existing_file = False
+    from_existing_file = True
     var_scaled_PSD = False
 
     # METHOD 1 ---------------------------------------------------------------------------------------------------------
     # find peaks and learn centres of mass of neporuseno
     delta_f = 5
     peak_distance = delta_f * 2
-    n_peaks = 10
+    n_peaks = 3
 
     # Create M1 instance
     m1 = M1(Preprocessor(), delta_f=delta_f, peak_distance=peak_distance, n_peaks=n_peaks,
@@ -304,8 +315,8 @@ if __name__ == '__main__':
     m2 = M2(var_scaled_PSD=var_scaled_PSD)
 
     # multiscale params
-    bin_sizes = (10, )
-    tresholds = (0.20, )
+    bin_sizes = (40, )
+    tresholds = (0.4, )
     plot_distributions = True
 
     distributions_1 = m2.get_multiscale_distributions(paths[0], bin_sizes=bin_sizes, thresholds=tresholds)

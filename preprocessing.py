@@ -37,7 +37,7 @@ class Preprocessor:
                  freq_range=(0, 256),
                  noise_f_rem=(2, 50, 100, 150, 200),
                  noise_df_rem=(2, 5, 2, 5, 2),
-                 mov_filt_size=10):
+                 mov_filt_size=5):
         """
 
         :param fs: (int) sampling frequency of the acquisition
