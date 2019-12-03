@@ -21,7 +21,6 @@ def gensig(N, fs, facc):
 def autocorr(x):
     """ autokorelační funkce """
     N = x.shape[0]  # počet vzorků signálu
-
     XX = hankel(x[1:])  # vytvoření hankelovy matice z prvků x[1] až x[N-1] (horní levá trojúhelníková matice)
     vX = x[:N-1]  # vektor x[0] až x[N-2]
     Rrr = np.matmul(XX, vX)/N - x.mean()**2  # výpočet normalizované ACF

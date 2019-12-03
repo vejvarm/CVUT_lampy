@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     # LOGGING
     timestamp = datetime.strftime(datetime.now(), "%Y-%m-%d_%H-%M")
-    root = "D:\\!private\\Lord\\Git\\CVUT_lampy"
+    root = ".."
     result_dir = f"{root}\\results\\models\\{timestamp}\\"
     log_dir = f"{result_dir}\\logs"
 

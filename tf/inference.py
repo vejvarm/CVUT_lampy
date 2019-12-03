@@ -4,7 +4,7 @@ import tensorflow as tf
 from tf.Model import load_dataset, prepare_dataset
 
 if __name__ == '__main__':
-    path_to_folder = "d:/!private/Lord/Git/CVUT_lampy/results/models/2019-11-17_00-20/"
+    path_to_folder = "../results/models/2019-12-03_14-44/"
     checkpoint = tf.train.latest_checkpoint(path_to_folder)
 
     # load model architecture (with last trained weights)
@@ -17,7 +17,7 @@ if __name__ == '__main__':
 
     states = ["neporuseno", "poruseno"]
     for state in states:
-        validation_path = f"d:/!private/Lord/Git/CVUT_lampy/data/validace/{state}/"
+        validation_path = f"../data/validace/{state}/"
 
         X = np.load(validation_path+"X.npy")
         y = np.load(validation_path+"y.npy")

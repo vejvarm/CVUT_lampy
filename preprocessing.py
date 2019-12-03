@@ -5,7 +5,9 @@
 # odstranění násobků 50 Hz (el.mag. rušení)
 # vyhladit plovoucím průměrem (coarse graining) --- průměr z okolních hodnot
 # odstranění trendů (0 - 50 Hz, 0 - 100 Hz)
-
+# TODO: frekvence navrhovaného filtru _calc_filter (momentálně špatně)
+# TODO: kratší data s křížovou entropií
+# TODO: zpráva na fungující křížovou entropii
 
 import os
 from copy import deepcopy
@@ -14,6 +16,7 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 from scipy.io import loadmat
+from scipy.signal import butter, filtfilt
 from scipy.optimize import leastsq
 from scipy.linalg import hankel
 from tqdm import tqdm
@@ -35,6 +38,8 @@ class Preprocessor:
                  fs=512,
                  ns_per_hz=10,
                  freq_range=(0, 256),
+                 tdf_order=5,
+                 tdf_range=(45, 55),
                  noise_f_rem=(2, 50, 100, 150, 200),
                  noise_df_rem=(2, 5, 2, 5, 2),
                  mov_filt_size=5):
@@ -43,6 +48,8 @@ class Preprocessor:
         :param fs: (int) sampling frequency of the acquisition
         :param ns_per_hz: (int) desired number of samples per Hertz in FFT
         :param freq_range: (list/tuple) (minimum frequency, maximum frequency) rest is thrown away
+        :param tdf_order: (int) order of the time domain bandreject filter
+        :param tdf_range: (list/tuple) time domain filter bandreject frequency area (lower bound, upper bound)
         :param noise_f_rem: (list/tuple) frequencies that should be removed (zeroed out) from the power spectrum
         :param noise_df_rem: (list/tuple) range around f_rem that should also be removed
         :param mov_filt_size: (int) length of the rectangular filter for moving average application
@@ -50,9 +57,13 @@ class Preprocessor:
         self.fs = fs
         self.ns_per_hz = ns_per_hz
         self.freq_range = freq_range
+        self.tdf_order = tdf_order
+        self.tdf_range = tdf_range
         self.noise_f_rem = noise_f_rem
         self.noise_df_rem = noise_df_rem
         self.mov_filt_size = mov_filt_size
+
+        self.b, self.a = self._calc_filter(self.tdf_order, self.fs, self.tdf_range)
 
     def get_config_values(self):
         return tuple(self.__dict__.values())
@@ -145,51 +156,57 @@ class Preprocessor:
         # check if self.fs fits to value of 'FrekvenceSignalu'
         assert df['FrekvenceSignalu'] == self.fs, f"Value of 'FrekvenceSignalu' in {fullpath2file} doesn't correspond with self.fs ({self.fs} Hz)"
 
-        for i, a in enumerate(acc):
+        # initialize plot if 'plot_semiresults' == True
+        nops = 9  # number of preprocessing operations (for plotting)
+        if plot_semiresults:
+            fig, ax = plt.subplots(nops + 1, naccs)
+        else:
+            ax = np.empty((nops + 1, naccs))
+            ax[:] = np.nan
 
-            nvals, nmeas = a.shape
-            nops = 8  # number of preprocessing operations (for plotting)
+        for i, arr in enumerate(acc):
+
+            nvals, nmeas = arr.shape
             time = np.arange(nvals) / self.fs
 
-            # initialize plot if 'plot_semiresults' == True
-            if plot_semiresults:
-                fig, ax = plt.subplots(nops+1, 1)
-            else:
-                ax = [None]*(nops+1)
+            self.conditional_plot(time, arr.mean(axis=1), ax[0, i], plot_semiresults, xlabel='time (s)', ylabel='μ(arr)', title='raw acc')
 
-            self.conditional_plot(time, a.mean(axis=1), ax[0], plot_semiresults, xlabel='time (s)', ylabel='μ(a)', title='raw acceleration (acc)')
-
-            # normalize 'a' to mean==0 and variance==1
-            a = self._calc_zscore(a)
-            self.conditional_plot(time, a.mean(axis=1), ax[1], plot_semiresults, xlabel='time (s)', ylabel='μ(a)', title='normalized acc')
+            # normalize 'arr' to mean==0 and variance==1
+            arr = self._calc_zscore(arr)
+            self.conditional_plot(time, arr.mean(axis=1), ax[1, i], plot_semiresults, xlabel='time (s)', ylabel='μ(arr)', title='norm acc')
 
             # calculate autocorrelation function to reduce noise
-            a = self._autocorr(a)
-            self.conditional_plot(time[:-1], a.mean(axis=1), ax[2], plot_semiresults, xlabel='time (s)', ylabel='ρxx', title='autocorrelation of acc')
+            arr = self._autocorr(arr)
+            self.conditional_plot(time[:-1], arr.mean(axis=1), ax[2, i], plot_semiresults, xlabel='time (s)', ylabel='ρxx', title='autocorr of acc')
 
-            # calculate frequency values and power spectral density (psd) of 'a'
-            freq_vals[i], psd = self._calc_psd(a)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[3], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='Power spectral density (psd)')
+            # remove area around 50 Hz noise using time domain filter
+            arr = self._apply_time_domain_filter(self.b, self.a, arr)
+            self.conditional_plot(time[:-1], arr.mean(axis=1), ax[3, i], plot_semiresults, xlabel='time (s)',
+                                  ylabel='ρxx 50Hz filt', title='50 Hz filt of ρxx')
+
+            # calculate frequency values and power spectral density (psd) of 'arr'
+            freq_vals[i], psd = self._calc_psd(arr)
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[4, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='psd')
 
             # remove noise based on values in self.noise_f_rem and self.noise_df_rem
             psd = self._remove_noise(psd, replace_with="min")
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[4], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='psd without *50Hz')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[5, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='psd without *50Hz')
 
             # use moving average to smooth out the spectrum and remove noise
             psd = self._coarse_grain(psd)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[5], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='coarse grained psd')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[6, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='coarse grain')
 
             # normalize 'psd' to mean==0 and variance==1
             psd = (psd - psd.mean())/psd.std()
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[6], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='normalized psd')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[7, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='norm psd')
 
             # remove trend
             psd = self._detrend(freq_vals[i], psd)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[7], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='detrended psd')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[8, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='detrend psd')
 
             # remove negative values
             psd = self._remove_negative(psd)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[8], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='nonnegative psd')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[9, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='nonnegative psd')
 
             # remove everything lower than mode:
 #            psd = self._remove_below_mode(psd)
@@ -255,6 +272,14 @@ class Preprocessor:
             vX = a[:-1]  # vektor a[0] až a[N-2]
             Rrr[:, i] = np.matmul(XX, vX) / N - a.mean() ** 2  # výpočet normalizované ACF
         return Rrr
+
+    @staticmethod
+    def _calc_filter(order, fs, frange=(45, 55)):
+        b, a = butter(order, np.array(frange)/fs/0.5, 'bandstop')
+        return b, a
+
+    def _apply_time_domain_filter(self, b, a, arr):
+        return filtfilt(b, a, arr)
 
     @staticmethod
     def _hamming(arr):
@@ -392,9 +417,11 @@ class Preprocessor:
 if __name__ == '__main__':
 
     plot_semiresults = True
-    nmeas = 5
+    nmeas = 144
 
     p = Preprocessor()
 
-    freqs, psd = p.run(["./data/trening/poruseno/2months/06202019_Acc.mat"], return_as="ndarray",
+    freqs, psd = p.run(["data/trening/neporuseno/2months/08072018_AccM.mat"], return_as="ndarray",
                        plot_semiresults=plot_semiresults, nmeas=nmeas)
+
+    plt.show()
