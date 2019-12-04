@@ -5,7 +5,6 @@
 # odstranění násobků 50 Hz (el.mag. rušení)
 # vyhladit plovoucím průměrem (coarse graining) --- průměr z okolních hodnot
 # odstranění trendů (0 - 50 Hz, 0 - 100 Hz)
-# TODO: frekvence navrhovaného filtru _calc_filter (momentálně špatně)
 # TODO: kratší data s křížovou entropií
 # TODO: zpráva na fungující křížovou entropii
 
@@ -21,6 +20,7 @@ from scipy.optimize import leastsq
 from scipy.linalg import hankel
 from tqdm import tqdm
 
+from flags import FLAGS
 
 def _remove_negative(psd_arr):
     """
@@ -40,9 +40,11 @@ class Preprocessor:
                  freq_range=(0, 256),
                  tdf_order=5,
                  tdf_ranges=((45, 55), (95, 105), (145, 155), (195, 205)),
+                 use_autocorr = True,
                  noise_f_rem=(0, ),
                  noise_df_rem=(0, ),
-                 mov_filt_size=5):
+                 mov_filt_size=5,
+                 rem_neg = True):
         """
 
         :param fs: (int) sampling frequency of the acquisition
@@ -50,31 +52,39 @@ class Preprocessor:
         :param freq_range: (list/tuple) (minimum frequency, maximum frequency) rest is thrown away
         :param tdf_order: (int) order of the time domain bandreject filter
         :param tdf_ranges: (List/Tuple[List/Tuple]) time domain filter bandreject frequency areas ((lb1, ub1), (lb2, ub2), ...)
+        :param use_autocorr: (bool) if True, calculate autocorrelation function before transforming to psd
         :param noise_f_rem: (list/tuple) frequencies that should be removed (zeroed out) from the power spectrum
         :param noise_df_rem: (list/tuple) range around f_rem that should also be removed
         :param mov_filt_size: (int) length of the rectangular filter for moving average application
+        :param rem_neg: (bool) if True, remove negative values after the final preprocessing stage
         """
         self.fs = fs
         self.ns_per_hz = ns_per_hz
         self.freq_range = freq_range
         self.tdf_order = tdf_order
         self.tdf_ranges = np.array(tdf_ranges)  # 2D array
+        self.use_autocorr = use_autocorr
         self.noise_f_rem = noise_f_rem
         self.noise_df_rem = noise_df_rem
         self.mov_filt_size = mov_filt_size
+        self.rem_neg = rem_neg
 
         # calculate numerators and denominators of time domain frequency filters
         self.nums, self.denoms = self._make_bandstop_filters()
 
+        # initialize counter for conditional plot
+        self.cplot_call = 0
+
     def get_config_values(self):
         return tuple(self.__dict__.values())
 
-    def run(self, paths, return_as='dict', plot_semiresults=False, nmeas=None):
+    def run(self, paths, return_as='dict', plot_semiresults=False, every=1, nmeas=None):
         """
 
         :param paths: (list/tuple) strings of paths leading to .mat files or folder with .mat files for loading
         :param return_as: (string) if 'dict', returns a dictionary, if 'ndarray' returns an ndarray of only psd
         :param plot_semiresults: if True, make a plot after each preprocessing operation
+        :param every: if > 1, only every 'every'eth acc will be plotted (e.g. every=2 means that every 2nd acc is plotted)
         :param nmeas: if None, take all measurements available in file, if (int), take first nmeas measurements
         :return preprocessed:
             if return_as == 'dict': Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]] dict of preprocessed files
@@ -105,12 +115,12 @@ class Preprocessor:
                             f_name, f_ext = os.path.splitext(file)
                             if f_ext == '.mat':
                                 fullpath = os.path.join(p, file)
-                                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath, plot_semiresults, nmeas)
+                                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath, plot_semiresults, every, nmeas)
                                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
                             pbar.update(1)
             elif os.path.splitext(path)[-1] == '.mat':
                 # leads to .mat file ... load directly
-                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path, plot_semiresults, nmeas)
+                freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path, plot_semiresults, every, nmeas)
                 f_name = os.path.splitext(os.path.basename(path))[0]
                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
             else:
@@ -130,11 +140,12 @@ class Preprocessor:
         else:
             raise AttributeError("return_as should be either 'dict' or 'ndarray'")
 
-    def _preprocess(self, fullpath2file, plot_semiresults=False, nmeas=None):
+    def _preprocess(self, fullpath2file, plot_semiresults=False, every=1, nmeas=None):
         """ run the preprocessing pipeline
 
         :param fullpath2file: full path to .mat file that should be preprocessed
         :param plot_semiresults: if True, make a plot after each preprocessing operation
+        :param every: if > 1, only every 'every'eth acc will be plotted (e.g. every=2 means that every 2nd acc is plotted)
         :param nmeas: if None, take all measurements available in file, if (int), take first nmeas measurements
         :return:
             :var freq_vals:  (1D ndarray) frequency values (x axis) [fs*ns_per_hz//2],
@@ -144,7 +155,7 @@ class Preprocessor:
         """
         df = self._mat2dict(fullpath2file)
 
-        naccs = 6
+        naccs = FLAGS.naccs
         freq_vals = [[]]*naccs
         psd_list = [[]]*naccs
 
@@ -158,56 +169,77 @@ class Preprocessor:
         assert df['FrekvenceSignalu'] == self.fs, f"Value of 'FrekvenceSignalu' in {fullpath2file} doesn't correspond with self.fs ({self.fs} Hz)"
 
         # initialize plot if 'plot_semiresults' == True
-        nops = 9  # number of preprocessing operations (for plotting)
+        nops = 8 - int(not self.use_autocorr) - int(not self.rem_neg)  # number of preprocessing operations (for plotting)
         if plot_semiresults:
-            fig, ax = plt.subplots(nops + 1, naccs)
+            ncols = naccs//every
+            fig, ax = plt.subplots(nops, ncols)
+            if ncols <= 1:
+                ax = np.expand_dims(ax, axis=-1)
+            plt.subplots_adjust(top=0.963,
+                                bottom=0.061,
+                                left=0.048,
+                                right=0.992,
+                                hspace=1.0,
+                                wspace=0.171)  # empirical setting on 27' FullHD monitor
         else:
-            ax = np.empty((nops + 1, naccs))
+            fig = None
+            ax = np.empty((nops, naccs))
             ax[:] = np.nan
 
         for i, arr in enumerate(acc):
 
+            # reset counter for conditional plot calls
+            self.cplot_call = 0
+
             nvals, nmeas = arr.shape
             time = np.arange(nvals) / self.fs
 
-            self.conditional_plot(time, arr.mean(axis=1), ax[0, i], plot_semiresults, xlabel='time (s)', ylabel='μ(arr)', title='raw acc')
-
             # normalize 'arr' to mean==0 and variance==1
             arr = self._calc_zscore(arr)
-            self.conditional_plot(time, arr.mean(axis=1), ax[1, i], plot_semiresults, xlabel='time (s)', ylabel='μ(arr)', title='norm acc')
+            self.conditional_plot(time, arr.mean(axis=1), plot_semiresults, ax, i, every,
+                                  xlabel='', ylabel='μ(arr)', title=f'norm acc {i}')
 
             # remove area around 50 Hz noise using time domain filter
             arr = self._apply_time_domain_filters(arr)
-            self.conditional_plot(time, arr.mean(axis=1), ax[2, i], plot_semiresults, xlabel='time (s)',
-                                  ylabel='μ(arr)', title='time domain filtering')
+            self.conditional_plot(time, arr.mean(axis=1), plot_semiresults, ax, i, every,
+                                  xlabel='time (s)', ylabel='μ(arr)', title='time domain filtering')
 
             # calculate autocorrelation function to reduce noise
-            arr = self._autocorr(arr)
-            self.conditional_plot(time[:-1], arr.mean(axis=1), ax[3, i], plot_semiresults, xlabel='time (s)', ylabel='ρxx', title='autocorr of acc')
+            if self.use_autocorr:
+                arr = self._autocorr(arr)
+                self.conditional_plot(time[:-1], arr.mean(axis=1), plot_semiresults, ax, i, every,
+                                      xlabel='time (s)', ylabel='ρxx', title='autocorr of acc')
 
             # calculate frequency values and power spectral density (psd) of 'arr'
             freq_vals[i], psd = self._calc_psd(arr)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[4, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='psd')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                  xlabel='', ylabel='psd', title='psd')
 
             # remove noise based on values in self.noise_f_rem and self.noise_df_rem
-            psd = self._remove_noise(psd, replace_with="min")
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[5, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='freq domain filtering')
+#            psd = self._remove_noise(psd, replace_with="min")
+#            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+#                                  xlabel='freqency (Hz)', ylabel='psd', title='freq domain filtering')
 
             # use moving average to smooth out the spectrum and remove noise
             psd = self._coarse_grain(psd)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[6, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='coarse grain')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                  xlabel='', ylabel='psd', title='coarse grain')
 
             # normalize 'psd' to mean==0 and variance==1
             psd = (psd - psd.mean())/psd.std()
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[7, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='norm psd')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                  xlabel='', ylabel='psd', title='norm psd')
 
             # remove trend
             psd = self._detrend(freq_vals[i], psd)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[8, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='detrend psd')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                  xlabel='', ylabel='psd', title='detrend psd')
 
             # remove negative values
-            psd = self._remove_negative(psd)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[9, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='nonnegative psd')
+            if self.rem_neg:
+                psd = self._remove_negative(psd)
+                self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                      xlabel='freqency (Hz)', ylabel='psd', title='nonnegative psd')
 
             # remove everything lower than mode:
 #            psd = self._remove_below_mode(psd)
@@ -223,14 +255,20 @@ class Preprocessor:
 
         return freq_vals[0], psd_list, wind_dir, wind_spd
 
-    @staticmethod
-    def conditional_plot(x, y, ax=None, cond=False, xlabel='x', ylabel='y', title=''):
-        """ Plots 'x' and 'y' to 'ax' as a line plot if 'cond' == True """
-        if cond:
-            ax.plot(x, y)
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel(ylabel)
-            ax.set_title(title)
+    def conditional_plot(self, x, y, cond=False, ax=None, col=0, every=1, xlabel='x', ylabel='y', title='', scale="linear"):
+        """ Plots 'x' and 'y' to 'ax' as a line plot if 'cond' == True
+            plot only when j % every == 0 (default 'every = 1' which means that every input is plotted if cond==True)
+        """
+        row = self.cplot_call
+        jj = col // every
+        if cond and ax[row, jj] and not col % every:
+            ax[row, jj].plot(x, y)
+            ax[row, jj].set_xlabel(xlabel)
+            ax[row, jj].set_ylabel(ylabel)
+            ax[row, jj].set_title(title)
+            ax[row, jj].set_yscale(scale)
+
+        self.cplot_call += 1
 
     @staticmethod
     def _mat2dict(path):
@@ -261,7 +299,9 @@ class Preprocessor:
 
     @staticmethod
     def _autocorr(arr):
-        """ calculate autocorrelation function from the array (arr) to reduce noise """
+        """ calculate autocorrelation function from the array (arr) to reduce noise
+            inspired by http://dsp.vscht.cz/konference_matlab/MATLAB09/prispevky/079_pavlik.pdf
+        """
         N = arr.shape[0]  # počet vzorků signálu
         nmeas = arr.shape[1]  # počet měření
 
@@ -275,11 +315,9 @@ class Preprocessor:
         return Rrr
 
     def _make_bandstop_filters(self):
-        # calculate a bandstop filter params from given input parameters
+        """ calculate a bandstop filter params from given input parameters """
         f_nyquist = self.fs/2
         Wh = self.tdf_ranges/f_nyquist
-
-        print(Wh.shape)
 
         nfilts = Wh.shape[0]
 
@@ -294,6 +332,7 @@ class Preprocessor:
         return nums, denoms
 
     def _apply_time_domain_filters(self, arr):
+        """apply all calculated bandstop filteres on arr"""
         nfilts = self.nums.shape[0]
 
         for i in range(arr.shape[-1]):
@@ -436,12 +475,15 @@ class Preprocessor:
 
 if __name__ == '__main__':
 
+    autocorr = False
+    rem_neg = True
     plot_semiresults = True
-    nmeas = 1
+    nmeas = 144
+    every = 6
 
-    p = Preprocessor()
+    p = Preprocessor(use_autocorr=autocorr, rem_neg=rem_neg)
 
     freqs, psd = p.run(["data/trening/neporuseno/2months/08072018_AccM.mat"], return_as="ndarray",
-                       plot_semiresults=plot_semiresults, nmeas=nmeas)
+                       plot_semiresults=plot_semiresults, every=every, nmeas=nmeas)
 
     plt.show()

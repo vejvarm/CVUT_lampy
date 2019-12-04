@@ -13,6 +13,8 @@ from tensorflow.keras.callbacks import EarlyStopping, TensorBoard, ModelCheckpoi
 
 from scipy.io import loadmat
 
+from flags import FLAGS
+
 # global settings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.keras.backend.set_floatx('float64')
@@ -45,8 +47,8 @@ def _mat2ds(path):
 
     :return:
     """
-    naccs = 6
-    nlamps = 3
+    naccs = FLAGS.naccs
+    nlamps = FLAGS.nlamps
 
     df = loadmat(path)
 

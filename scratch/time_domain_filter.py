@@ -3,8 +3,10 @@ from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import numpy as np
 
+from flags import FLAGS
 
-def load_accs(path, naccs=6):
+
+def load_accs(path, naccs=FLAGS.naccs):
     df = loadmat(path)
 
     accs = np.array([df[f'Acc{i}'] for i in range(1, naccs + 1)])  # [naccs, nsamples, nmeas]

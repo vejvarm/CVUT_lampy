@@ -7,6 +7,7 @@ from os import path
 from matplotlib import pyplot as plt
 from scipy import signal
 
+from flags import FLAGS
 from preprocessing import Preprocessor
 
 
@@ -35,7 +36,7 @@ class Method:
 
         try:
             if self.from_existing_file and "X.npy" in path:
-                nlamps = 3
+                nlamps = FLAGS.nlamps
                 freqs, X = self.preprocessor.run([path], return_as="ndarray")
 
                 X = np.split(X, nlamps, axis=0)  # reshape from (ndays.nmeas.nlamps, nfft//2, naccs//nlamps)
@@ -59,9 +60,10 @@ class Method:
             var = np.nanvar(psd, axis=(0, 3))
 
             # save freqs and PSD files
-            np.save(path_to_freqs, freqs)
-            np.save(path_to_PSD, mean)
-            np.save(path_to_vars, var)
+            if ".mat" not in path:
+                np.save(path_to_freqs, freqs)
+                np.save(path_to_PSD, mean)
+                np.save(path_to_vars, var)
 
         return freqs, mean, var
 
@@ -277,11 +279,14 @@ class M2(Method):
 
 
 if __name__ == '__main__':
-    folder = "trening"
-    dataset = ["neporuseno", "neporuseno2", "poruseno"]
-    period = "2months"  # week or 2months
-    filename = "X.npy"
-    paths = [f"./data/{folder}/{d}/{period}/{filename}" for d in dataset]
+    setting = "training"
+    folder = FLAGS.paths[setting]["folder"]
+    dataset = FLAGS.paths[setting]["dataset"]
+    period = ["2months", "week8", "week8"]
+    filename = ["X.npy"]*len(dataset)
+    paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
+
+    print(paths)
 
     preprocessor = Preprocessor()
 
@@ -316,7 +321,7 @@ if __name__ == '__main__':
 
     # multiscale params
     bin_sizes = (40, )
-    tresholds = (0.4, )
+    tresholds = (0.5, )
     plot_distributions = True
 
     distributions_1 = m2.get_multiscale_distributions(paths[0], bin_sizes=bin_sizes, thresholds=tresholds)

@@ -2,17 +2,25 @@ from preprocessing import Preprocessor
 
 import numpy as np
 
+from flags import FLAGS
 
 if __name__ == '__main__':
-    folder = "validace"
-    dataset = ["neporuseno", "poruseno"]
-    period = ""  # week or 2months
-    paths = [f"../data/{folder}/{d}/{period}" for d in dataset]
 
-    nlamps = 3
-    naccs_per_lamp = 2
+    # physical settings
+    nlamps = FLAGS.nlamps
+    naccs_per_lamp = FLAGS.naccs_per_lamp
 
-    preprocessor = Preprocessor()
+    # path settings
+    root = ".."
+    setting = "training"  # "training" or "validation"
+    folder = FLAGS.paths[setting]["folder"]
+    dataset = FLAGS.paths[setting]["dataset"]
+    period = FLAGS.paths[setting]["period"]  # week or 2months
+    paths = [f"{root}/{folder}/{d}/{period}" for d in dataset]
+
+    # preprocessing settings
+    preprocessor = Preprocessor(use_autocorr=FLAGS.preprocessing["use_autocorr"],
+                                rem_neg=FLAGS.preprocessing["rem_neg"])
 
     for path in paths:
         freqs, psd_array = preprocessor.run([path], return_as="ndarray")
@@ -35,7 +43,7 @@ if __name__ == '__main__':
             labels = np.concatenate((np.zeros((ndays*nmeas, ), dtype=np.float32),
                                      np.ones((ndays*nmeas*(nlamps-1), ), dtype=np.float32)))
 
-        print(psd_array.shape, labels.shape)
+        print(f"X: {psd_array.shape}\n y: {labels.shape}")
 
         # save data (X) and labels (y) to numpy arrays in respective paths
         np.save(path+"/X.npy", psd_array)
