@@ -39,9 +39,9 @@ class Preprocessor:
                  ns_per_hz=10,
                  freq_range=(0, 256),
                  tdf_order=5,
-                 tdf_range=(45, 55),
-                 noise_f_rem=(2, 50, 100, 150, 200),
-                 noise_df_rem=(2, 5, 2, 5, 2),
+                 tdf_ranges=((45, 55), (95, 105), (145, 155), (195, 205)),
+                 noise_f_rem=(0, ),
+                 noise_df_rem=(0, ),
                  mov_filt_size=5):
         """
 
@@ -49,7 +49,7 @@ class Preprocessor:
         :param ns_per_hz: (int) desired number of samples per Hertz in FFT
         :param freq_range: (list/tuple) (minimum frequency, maximum frequency) rest is thrown away
         :param tdf_order: (int) order of the time domain bandreject filter
-        :param tdf_range: (list/tuple) time domain filter bandreject frequency area (lower bound, upper bound)
+        :param tdf_ranges: (List/Tuple[List/Tuple]) time domain filter bandreject frequency areas ((lb1, ub1), (lb2, ub2), ...)
         :param noise_f_rem: (list/tuple) frequencies that should be removed (zeroed out) from the power spectrum
         :param noise_df_rem: (list/tuple) range around f_rem that should also be removed
         :param mov_filt_size: (int) length of the rectangular filter for moving average application
@@ -58,12 +58,13 @@ class Preprocessor:
         self.ns_per_hz = ns_per_hz
         self.freq_range = freq_range
         self.tdf_order = tdf_order
-        self.tdf_range = tdf_range
+        self.tdf_ranges = np.array(tdf_ranges)  # 2D array
         self.noise_f_rem = noise_f_rem
         self.noise_df_rem = noise_df_rem
         self.mov_filt_size = mov_filt_size
 
-        self.b, self.a = self._calc_filter(self.tdf_order, self.fs, self.tdf_range)
+        # calculate numerators and denominators of time domain frequency filters
+        self.nums, self.denoms = self._make_bandstop_filters()
 
     def get_config_values(self):
         return tuple(self.__dict__.values())
@@ -175,14 +176,14 @@ class Preprocessor:
             arr = self._calc_zscore(arr)
             self.conditional_plot(time, arr.mean(axis=1), ax[1, i], plot_semiresults, xlabel='time (s)', ylabel='μ(arr)', title='norm acc')
 
+            # remove area around 50 Hz noise using time domain filter
+            arr = self._apply_time_domain_filters(arr)
+            self.conditional_plot(time, arr.mean(axis=1), ax[2, i], plot_semiresults, xlabel='time (s)',
+                                  ylabel='μ(arr)', title='time domain filtering')
+
             # calculate autocorrelation function to reduce noise
             arr = self._autocorr(arr)
-            self.conditional_plot(time[:-1], arr.mean(axis=1), ax[2, i], plot_semiresults, xlabel='time (s)', ylabel='ρxx', title='autocorr of acc')
-
-            # remove area around 50 Hz noise using time domain filter
-            arr = self._apply_time_domain_filter(self.b, self.a, arr)
-            self.conditional_plot(time[:-1], arr.mean(axis=1), ax[3, i], plot_semiresults, xlabel='time (s)',
-                                  ylabel='ρxx 50Hz filt', title='50 Hz filt of ρxx')
+            self.conditional_plot(time[:-1], arr.mean(axis=1), ax[3, i], plot_semiresults, xlabel='time (s)', ylabel='ρxx', title='autocorr of acc')
 
             # calculate frequency values and power spectral density (psd) of 'arr'
             freq_vals[i], psd = self._calc_psd(arr)
@@ -190,7 +191,7 @@ class Preprocessor:
 
             # remove noise based on values in self.noise_f_rem and self.noise_df_rem
             psd = self._remove_noise(psd, replace_with="min")
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[5, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='psd without *50Hz')
+            self.conditional_plot(freq_vals[i], psd.mean(axis=1), ax[5, i], plot_semiresults, xlabel='freqency (Hz)', ylabel='psd', title='freq domain filtering')
 
             # use moving average to smooth out the spectrum and remove noise
             psd = self._coarse_grain(psd)
@@ -273,13 +274,32 @@ class Preprocessor:
             Rrr[:, i] = np.matmul(XX, vX) / N - a.mean() ** 2  # výpočet normalizované ACF
         return Rrr
 
-    @staticmethod
-    def _calc_filter(order, fs, frange=(45, 55)):
-        b, a = butter(order, np.array(frange)/fs/0.5, 'bandstop')
-        return b, a
+    def _make_bandstop_filters(self):
+        # calculate a bandstop filter params from given input parameters
+        f_nyquist = self.fs/2
+        Wh = self.tdf_ranges/f_nyquist
 
-    def _apply_time_domain_filter(self, b, a, arr):
-        return filtfilt(b, a, arr)
+        print(Wh.shape)
+
+        nfilts = Wh.shape[0]
+
+        nums = np.empty((nfilts, 2*self.tdf_order + 1))
+        denoms = np.empty((nfilts, 2*self.tdf_order + 1))
+
+        for i in range(nfilts):
+            b, a, *_ = butter(self.tdf_order, Wh[i, :], 'bandstop')
+            nums[i, :] = b
+            denoms[i, :] = a
+
+        return nums, denoms
+
+    def _apply_time_domain_filters(self, arr):
+        nfilts = self.nums.shape[0]
+
+        for i in range(arr.shape[-1]):
+            for num, denom in zip(self.nums, self.denoms):
+                arr[:, i] = filtfilt(num, denom, arr[:, i])  # updating in place
+        return arr
 
     @staticmethod
     def _hamming(arr):
@@ -417,7 +437,7 @@ class Preprocessor:
 if __name__ == '__main__':
 
     plot_semiresults = True
-    nmeas = 144
+    nmeas = 1
 
     p = Preprocessor()
 

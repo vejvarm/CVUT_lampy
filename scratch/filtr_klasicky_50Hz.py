@@ -1,6 +1,7 @@
 from __future__ import division
 
 from scipy import signal
+from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -17,13 +18,6 @@ Fbandreject=200#Hz
 
 #Wn=1 ... Fnyquist
 #Wn=Fcutoff/Fnyquist
-
-def make_filter(order, fs, range=(40, 60)):
-    b, a = signal.butter(order, range/(fs*0.5))
-    return b, a
-
-def filter_data(b, a, x):
-    return signal.filtfilt(b, a, x)
 
 if __name__ == "__main__":
     b, a = signal.butter(5, [40/Fnyquist, 60/Fnyquist], 'bandstop')  #, analog=True)
