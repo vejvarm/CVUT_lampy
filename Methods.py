@@ -21,10 +21,33 @@ class Method:
         self.preprocessor = preprocessor
         self.from_existing_file = from_existing_file
 
-    def _get_PSD(self, path):
+    @staticmethod
+    def _calc_mean_and_var(psd, period=None, nmeas=144):
+        naccs, nfft, ndm = psd.shape
+        if period:
+            nsamples = ndm//nmeas//period
+        else:
+            nsamples = 1
+
+        mean = np.empty((nsamples, naccs, nfft))
+        var = np.empty((nsamples, naccs, nfft))
+
+        psd = np.array_split(psd, nsamples, axis=-1)  # split to cca "period" long entries
+#        print(f"period: {period}, nsamples: {nsamples}, len(psd): {len(psd)}")
+        # calculate mean and var from each entry
+        for i in range(nsamples):
+            mean[i, :, :] = psd[i].mean(axis=2)
+            var[i, :, :] = psd[i].var(axis=2)
+
+        return mean, var
+
+    def _get_PSD(self, path, period=None, remove_0th_dim=False):
         """ load freqs and PSD if the preprocessed files already exist, otherwise calculate freqs and PSD and save them
 
         :param path: (string) path to files with data
+        :param period: (int) number of days from which to aggregate
+
+        :return (freqs(1Darray), mean(1Darray), var(1Darray)):
         """
         if ".npy" in os.path.splitext(path)[-1]:
             folder_path = os.path.split(path)[0]
@@ -43,8 +66,8 @@ class Method:
                 X = np.dstack(X)                 # to (ndays.nmeas, nfft//2, naccs)
                 psd = X.transpose((2, 1, 0))     # and then to (naccs, nfft//2, ndays.nmeas)
 
-                mean = psd.mean(axis=2)
-                var = psd.var(axis=2)
+                mean, var = self._calc_mean_and_var(psd, period)
+
             elif self.from_existing_file:
                 freqs = np.load(path_to_freqs)
                 mean = np.load(path_to_PSD)
@@ -54,16 +77,23 @@ class Method:
                 raise FileNotFoundError
         except FileNotFoundError:
             freqs, psd = self.preprocessor.run([path], return_as="ndarray")
+            ndays, naccs, nfft, nmeas = psd.shape
+            # reshape from (ndays, naccs, nfft/2, nmeas) to (naccs, nfft//2, ndays.nmeas)
+            psd = psd.transpose((1, 2, 0, 3))
+            psd = psd.reshape((naccs, nfft, ndays*nmeas))
 
             # calculate PSD (== long term average values of psd)
-            mean = np.nanmean(psd, axis=(0, 3))
-            var = np.nanvar(psd, axis=(0, 3))
+            mean, var = self._calc_mean_and_var(psd, period=None, nmeas=nmeas)
 
             # save freqs and PSD files
             if ".mat" not in path:
                 np.save(path_to_freqs, freqs)
                 np.save(path_to_PSD, mean)
                 np.save(path_to_vars, var)
+
+        if not period and remove_0th_dim:
+            mean = mean.reshape(mean.shape[1:])
+            var = var.reshape(var.shape[1:])
 
         return freqs, mean, var
 
@@ -95,7 +125,7 @@ class M1(Method):
     def train(self, path):
         """ learn top peak indices and their centres of mass"""
 
-        freqs, PSD, PSD_var = self._get_PSD(path)
+        freqs, PSD, PSD_var = self._get_PSD(path, remove_0th_dim=True)
 
         if self.var_scaled_PSD:
             PSD_var = (PSD_var - PSD_var.min()) / (PSD_var.max() - PSD_var.min())  # normalize to interval (0, 1)
@@ -119,7 +149,7 @@ class M1(Method):
         :return: sum of squares of differences between trained COM and COM calculated from path
         """
 
-        freqs, PSD, PSD_var = self._get_PSD(path)
+        freqs, PSD, PSD_var = self._get_PSD(path, remove_0th_dim=True)
 
         if self.var_scaled_PSD:
             PSD_var = (PSD_var - PSD_var.min()) / (PSD_var.max() - PSD_var.min())  # normalize to interval (0, 1)
@@ -195,32 +225,71 @@ class M2(Method):
         self.thresholds = None
         self.var_scaled_PSD = var_scaled_PSD
 
-    def get_multiscale_distributions(self, path, bin_sizes=(10, ), thresholds=(0.1, )):
+        self.trained_distributions = None
+
+    def train(self, path, bin_sizes, thresholds):
+
+        self.bin_sizes = bin_sizes
+        self.thresholds = thresholds
+
+        self.trained_distributions = self.get_multiscale_distributions(path, self.bin_sizes, self.thresholds)
+
+        print("Training complete!")
+
+    def compare(self, path, period=None, print_results=True):
+
+        if not self.trained_distributions:
+            raise(ValueError, "Nejdříve je třeba metodu natrénovat (M2().train).")
+
+        valid_distributions = self.get_multiscale_distributions(path, self.bin_sizes, self.thresholds, period)
+
+        nperiods = len(valid_distributions)
+        nbins = len(self.bin_sizes)
+        nth = len(self.thresholds)
+
+        ce = np.empty((nperiods, nbins*nth))
+
+        if print_results:
+            print("\n--CROSS ENTROPY VALUES--")
+            print(f"|| period | bs |  th  || CEnt ||")
+        for per, period_dist in enumerate(valid_distributions):
+            for i, (((bin_sz, th), _, dtrain), ((_, _), _, dval)) in enumerate(zip(self.trained_distributions, period_dist)):
+                ce[per, i] = self._cross_entropy(dtrain, dval)
+                if print_results:
+                    print(f'|| {per:6d} | {bin_sz:2d} | {th:.2f} || {ce[per, i]:4.0f} ||')
+
+        return ce
+
+    def get_multiscale_distributions(self, path, bin_sizes=(10, ), thresholds=(0.1, ), period=None):
         """
 
-        :return multiscale_distributions: List[(1, 1), 1D array[nbins] 2D array[naccs, nbins]]
+        :return multiscale_distributions: List[(1, 1), 1D array[nbins], 2D array[naccs, nbins]]
         """
 
-        freqs, PSD, PSD_var = self._get_PSD(path)
-
-        if self.var_scaled_PSD:
-            PSD_var = (PSD_var - PSD_var.min())/(PSD_var.max() - PSD_var.min())  # normalize to interval (0, 1)
-            PSD = PSD*PSD_var
-
+        freqs, PSD, PSD_var = self._get_PSD(path, period)
 
         multiscale_distributions = list()
 
-        # multiscale (grid search way)
-        for bin_size in bin_sizes:
-            for threshold in thresholds:
-                freq_bins, PSD_bins = self._split_to_bins(freqs, PSD, bin_size)
+        for mean, var in zip(PSD, PSD_var):
+            if self.var_scaled_PSD:
+                var = (var - var.min())/(var.max() - var.min())  # normalize to interval (0, 1)
+                mean = mean*var
 
-                freq_binarized_mean = freq_bins.mean(axis=-1)
-                PSD_binarized_softmax = self._binarize_and_softmax(PSD_bins, threshold)
+            md = list()
 
-                multiscale_distributions.append([(bin_size, threshold), freq_binarized_mean, PSD_binarized_softmax])
+            # multiscale (grid search way)
+            for bin_size in bin_sizes:
+                for threshold in thresholds:
+                    freq_bins, PSD_bins = self._split_to_bins(freqs, mean, bin_size)
 
-        return multiscale_distributions
+                    freq_binarized_mean = freq_bins.mean(axis=-1)
+                    PSD_binarized_softmax = self._binarize_and_softmax(PSD_bins, threshold)
+
+                    md.append([(bin_size, threshold), freq_binarized_mean, PSD_binarized_softmax])
+
+            multiscale_distributions.append(md)
+
+        return multiscale_distributions if period else multiscale_distributions[0]
 
     @staticmethod
     def _cross_entropy(d1, d2):
@@ -245,7 +314,6 @@ class M2(Method):
         :return freq_bins (2D array) [počet binů, velikost jednoho binu]
                 psd_bins: (3D array) [počet měření, počet binů, počet frekvencí v jednom binu]
         """
-
         naccs, nfreqs = psd_array.shape
 
         nbins = nfreqs // bin_size + (nfreqs % bin_size > 0)
@@ -282,7 +350,7 @@ if __name__ == '__main__':
     setting = "training"
     folder = FLAGS.paths[setting]["folder"]
     dataset = FLAGS.paths[setting]["dataset"]
-    period = ["2months", "week8", "week8"]
+    period = [FLAGS.paths[setting]["period"]]*len(dataset)
     filename = ["X.npy"]*len(dataset)
     paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
 
@@ -300,7 +368,7 @@ if __name__ == '__main__':
     n_peaks = 3
 
     # Create M1 instance
-    m1 = M1(Preprocessor(), delta_f=delta_f, peak_distance=peak_distance, n_peaks=n_peaks,
+    m1 = M1(preprocessor, delta_f=delta_f, peak_distance=peak_distance, n_peaks=n_peaks,
             from_existing_file=from_existing_file, var_scaled_PSD=var_scaled_PSD)
 
     # Train the instance (learn top peaks and their COM)
@@ -317,16 +385,38 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # METHOD 2 ---------------------------------------------------------------------------------------------------------
-    m2 = M2(var_scaled_PSD=var_scaled_PSD)
+    m2 = M2(preprocessor, var_scaled_PSD=var_scaled_PSD)
 
     # multiscale params
-    bin_sizes = (40, )
-    tresholds = (0.5, )
-    plot_distributions = True
+    bin_sizes = (10, 20, 40, 80)
+    thresholds = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7)
+    plot_distributions = False
 
-    distributions_1 = m2.get_multiscale_distributions(paths[0], bin_sizes=bin_sizes, thresholds=tresholds)
-    distributions_2 = m2.get_multiscale_distributions(paths[1], bin_sizes=bin_sizes, thresholds=tresholds)
-    distributions_3 = m2.get_multiscale_distributions(paths[2], bin_sizes=bin_sizes, thresholds=tresholds)
+    # Train the method on 2 months of neporuseno
+    m2.train(paths[0], bin_sizes, thresholds)
+
+    ce2 = m2.compare(paths[1], period=1, print_results=False)
+    ce3 = m2.compare(paths[2], period=1, print_results=False)
+
+#    print(ce2.shape)  # (nperiods, nbins*nthresholds)
+
+    ce_diff = ce3 - ce2
+
+    nbins = len(bin_sizes)
+    nth = len(thresholds)
+
+    for i, day in enumerate(ce_diff):
+        daily_best = 0
+        for j, val in enumerate(day):
+            if val > daily_best:
+                daily_best = val
+                best_j = j
+                # TODO: bin statistics
+        print(f"day: {i}, bs: {bin_sizes[best_j%nbins]}, th: {thresholds[best_j%nth]} val: {daily_best}")
+
+    distributions_1 = m2.get_multiscale_distributions(paths[0], bin_sizes=bin_sizes, thresholds=thresholds)
+    distributions_2 = m2.get_multiscale_distributions(paths[1], bin_sizes=bin_sizes, thresholds=thresholds)
+    distributions_3 = m2.get_multiscale_distributions(paths[2], bin_sizes=bin_sizes, thresholds=thresholds)
 
     print("\n--CROSS ENTROPY VALUES--")
     print(f"| bs | trsh || ds2 | ds3 | diff |")

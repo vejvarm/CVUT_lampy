@@ -6,7 +6,7 @@ class FLAGS:
     paths = {
         "training": {"folder": "data/trening",
                      "dataset": ["neporuseno", "neporuseno2", "poruseno"],
-                     "period": "week8"
+                     "period": "2months"
                      },
         "validation": {"folder": "data/validace",
                        "dataset": ["neporuseno", "poruseno"],
@@ -15,6 +15,6 @@ class FLAGS:
     }
 
     preprocessing = {
-        "use_autocorr": False,
+        "use_autocorr": True,
         "rem_neg": True
     }
