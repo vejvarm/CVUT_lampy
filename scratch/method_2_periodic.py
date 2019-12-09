@@ -44,6 +44,8 @@ if __name__ == "__main__":
     period = [FLAGS.paths[setting]["period"]]*len(dataset)
     filename = ["X.npy"]*len(dataset)
     paths = [f"../{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
+#    paths[1] = f"../data/validace/neporuseno/X.npy"
+#    paths[2] = f"../data/validace/poruseno/X.npy"
 
     print(paths)
 
@@ -65,6 +67,10 @@ if __name__ == "__main__":
     ce2 = m2.compare(paths[1], period=1, print_results=False)
     ce3 = m2.compare(paths[2], period=1, print_results=False)
 
+    # NORMALIZACE???
+#    ce2 = (ce2 - ce2.mean())/ce2.std()
+#    ce3 = (ce3 - ce2.mean())/ce2.std()
+
     ce23 = np.vstack((ce2, ce3))
 
     print(ce23.shape)
@@ -74,10 +80,8 @@ if __name__ == "__main__":
     ce23_diff = np.diff(ce23, axis=0)
     # print(ce2.shape)  # (nperiods, nbins*nthresholds)
 
-    ce_diff = ce3 - ce2
-
-    ce2_best_params, ce2_periodic_best = calc_periodic_best(ce2_diff, bin_sizes, thresholds)
-    ce3_best_params, ce3_periodic_best = calc_periodic_best(ce3_diff, bin_sizes, thresholds)
+    ce2_best_params, ce2_periodic_best = calc_periodic_best(ce2, bin_sizes, thresholds)  # ce2_diff lepší pro valid data
+    ce3_best_params, ce3_periodic_best = calc_periodic_best(ce3, bin_sizes, thresholds)  # ce3_diff lepší pro valid data
 
     ce2_best_js = Counter(ce2_best_params)
     ce3_best_js = Counter(ce3_best_params)
