@@ -66,12 +66,13 @@ if __name__ == "__main__":
 
     ce2 = m2.compare(paths[1], period=1, print_results=False)
     ce3 = m2.compare(paths[2], period=1, print_results=False)
-
-    # NORMALIZACE???
-#    ce2 = (ce2 - ce2.mean())/ce2.std()
-#    ce3 = (ce3 - ce2.mean())/ce2.std()
-
     ce23 = np.vstack((ce2, ce3))
+
+    # NORMALIZACE podle ce23???
+#    ce2 = (ce2 - ce23.mean())/ce23.std()
+#    ce3 = (ce3 - ce23.mean())/ce23.std()
+
+
 
     print(ce23.shape)
 
