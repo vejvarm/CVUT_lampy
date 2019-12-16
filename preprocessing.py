@@ -44,7 +44,7 @@ class Preprocessor:
                  noise_f_rem=(0, ),
                  noise_df_rem=(0, ),
                  mov_filt_size=5,
-                 rem_neg = True):
+                 rem_neg=True):
         """
 
         :param fs: (int) sampling frequency of the acquisition
@@ -75,10 +75,13 @@ class Preprocessor:
         # initialize counter for conditional plot
         self.cplot_call = 0
 
+        # initialize dict for semiresults
+        self.semiresults = dict()
+
     def get_config_values(self):
         return tuple(self.__dict__.values())
 
-    def run(self, paths, return_as='dict', plot_semiresults=False, every=1, nmeas=None):
+    def run(self, paths, return_as='dict', plot_semiresults=False, every=1, nmeas=None, savefolder=None):
         """
 
         :param paths: (list/tuple) strings of paths leading to .mat files or folder with .mat files for loading
@@ -86,6 +89,7 @@ class Preprocessor:
         :param plot_semiresults: if True, make a plot after each preprocessing operation
         :param every: if > 1, only every 'every'eth acc will be plotted (e.g. every=2 means that every 2nd acc is plotted)
         :param nmeas: if None, take all measurements available in file, if (int), take first nmeas measurements
+        :param savefolder: if None, don't save pdf of plot, else save pdf of plot to savefolder
         :return preprocessed:
             if return_as == 'dict': Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]] dict of preprocessed files
             if return_as == 'ndarray': Tuple[1Darray[nfft/2, ], 4Darray[nfiles, naccs, nfft/2, nmeas]]
@@ -123,6 +127,10 @@ class Preprocessor:
                 freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path, plot_semiresults, every, nmeas)
                 f_name = os.path.splitext(os.path.basename(path))[0]
                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
+                # save plot to savefolder
+                if plot_semiresults and savefolder:
+                    os.makedirs(savefolder, exist_ok=True)
+                    plt.savefig(os.path.join(savefolder, f"{f_name}.pdf"))
             else:
                 print("Given path doesn't refer to .mat file or folder with .mat files. \n Ignoring path.")
                 continue
@@ -139,6 +147,52 @@ class Preprocessor:
             return freqs, psd_stacked
         else:
             raise AttributeError("return_as should be either 'dict' or 'ndarray'")
+
+    @staticmethod
+    def compare_arrs(x1, y1, x2, y2, title="Porovnání dvou vstupních polí.",
+                              label1="y1", label2="y2", savefolder=None):
+        fig, ax = plt.subplots(1, 1)
+
+        ax.plot(x1, y1, label=label1)
+        ax.plot(x2, y2, label=label2)
+
+        ax.set_title(title)
+        ax.set_xlabel("frekvence (Hz)")
+        plt.legend()
+
+        if savefolder:
+            os.makedirs(savefolder, exist_ok=True)
+            plt.savefig(os.path.join(savefolder, f"{label1}X{label2}.pdf"))
+
+    def compare_arrs_with_psd(self, x1, y1, x2, y2, suptitle="Porovnání časových a frekvenčních oblastí.",
+                              label1="y1", label2="y2", title1="y", title2="psd(y)", savefolder=None):
+        fig, ax = plt.subplots(2, 2)
+
+        ax[0, 0].plot(x1, y1, label=label1)
+        ax[1, 0].plot(x2, y2, label=label2)
+        ax[0, 1].plot(*self._calc_psd(np.expand_dims(y1, 1)))
+        ax[1, 1].plot(*self._calc_psd(np.expand_dims(y2, 1)))
+
+        plt.suptitle(suptitle)
+        ax[0, 0].set_title(title1)
+        ax[0, 1].set_title(title2)
+        ax[1, 0].set_xlabel("čas (s)")
+        ax[1, 1].set_xlabel("frekvence (Hz)")
+        ax[0, 0].set_ylabel(label1)
+        ax[0, 1].set_ylabel(f"psd({label1})")
+        ax[1, 0].set_ylabel(label2)
+        ax[1, 1].set_ylabel(f"psd({label2})")
+
+        plt.subplots_adjust(top=0.886,
+                            bottom=0.121,
+                            left=0.122,
+                            right=0.977,
+                            hspace=0.223,
+                            wspace=0.455)
+
+        if savefolder:
+            os.makedirs(savefolder, exist_ok=True)
+            plt.savefig(os.path.join(savefolder, f"{label1}X{label2}.pdf"))
 
     def _preprocess(self, fullpath2file, plot_semiresults=False, every=1, nmeas=None):
         """ run the preprocessing pipeline
@@ -169,18 +223,19 @@ class Preprocessor:
         assert df['FrekvenceSignalu'] == self.fs, f"Value of 'FrekvenceSignalu' in {fullpath2file} doesn't correspond with self.fs ({self.fs} Hz)"
 
         # initialize plot if 'plot_semiresults' == True
-        nops = 8 - int(not self.use_autocorr) - int(not self.rem_neg)  # number of preprocessing operations (for plotting)
+        nops = 6 - int(not self.use_autocorr) - int(not self.rem_neg)  # number of preprocessing operations (for plotting)
         if plot_semiresults:
             ncols = naccs//every
             fig, ax = plt.subplots(nops, ncols)
+            fig.set_size_inches([6.4, 12.8])
             if ncols <= 1:
                 ax = np.expand_dims(ax, axis=-1)
-            plt.subplots_adjust(top=0.963,
-                                bottom=0.061,
-                                left=0.048,
-                                right=0.992,
+            plt.subplots_adjust(top=0.958,
+                                bottom=0.091,
+                                left=0.103,
+                                right=0.985,
                                 hspace=1.0,
-                                wspace=0.171)  # empirical setting on 27' FullHD monitor
+                                wspace=0.166)  # empirical setting on 27' FullHD monitor
         else:
             fig = None
             ax = np.empty((nops, naccs))
@@ -196,50 +251,52 @@ class Preprocessor:
 
             # normalize 'arr' to mean==0 and variance==1
             arr = self._calc_zscore(arr)
-            self.conditional_plot(time, arr.mean(axis=1), plot_semiresults, ax, i, every,
-                                  xlabel='', ylabel='μ(arr)', title=f'norm acc {i}')
+            self._conditional_plot(time, arr.mean(axis=1), plot_semiresults, ax, i, every,
+                                   xlabel='čas (s)', ylabel='μ(arr)', key="01_norm",
+                                   title=f'normalizovaný signál z akcelerometru')
 
             # remove area around 50 Hz noise using time domain filter
             arr = self._apply_time_domain_filters(arr)
-            self.conditional_plot(time, arr.mean(axis=1), plot_semiresults, ax, i, every,
-                                  xlabel='time (s)', ylabel='μ(arr)', title='time domain filtering')
+            self._conditional_plot(time, arr.mean(axis=1), plot_semiresults, ax, i, every,
+                                   xlabel='čas (s)', ylabel='μ(arr)-*50Hz', key="02_td_filt",
+                                   title='filtrace násobků 50 Hz v čas. oblasti')
 
             # calculate autocorrelation function to reduce noise
             if self.use_autocorr:
                 arr = self._autocorr(arr)
-                self.conditional_plot(time[:-1], arr.mean(axis=1), plot_semiresults, ax, i, every,
-                                      xlabel='time (s)', ylabel='ρxx', title='autocorr of acc')
+                self._conditional_plot(time[:-1], arr.mean(axis=1), plot_semiresults, ax, i, every,
+                                       xlabel='čas (s)', ylabel='ρxx', key="03_autocorr",
+                                       title='výpočet autokorelační funkce')
 
             # calculate frequency values and power spectral density (psd) of 'arr'
             freq_vals[i], psd = self._calc_psd(arr)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
-                                  xlabel='', ylabel='psd', title='psd')
 
             # remove noise based on values in self.noise_f_rem and self.noise_df_rem
 #            psd = self._remove_noise(psd, replace_with="min")
-#            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
-#                                  xlabel='freqency (Hz)', ylabel='psd', title='freq domain filtering')
-
-            # use moving average to smooth out the spectrum and remove noise
-            psd = self._coarse_grain(psd)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
-                                  xlabel='', ylabel='psd', title='coarse grain')
+#            self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+#                                  xlabel='frekvence(Hz)', ylabel='psd', title='freq domain filtering')
 
             # normalize 'psd' to mean==0 and variance==1
             psd = (psd - psd.mean())/psd.std()
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
-                                  xlabel='', ylabel='psd', title='norm psd')
+            self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                   xlabel='frekvence(Hz)', ylabel='psd', key="04_psd_norm",
+                                   title='normalizovaná výkonová spektrální hustota (psd)')
+
+            # use moving average to smooth out the spectrum and remove noise
+            psd = self._coarse_grain(psd)
+            self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                   xlabel='frekvence(Hz)', ylabel='psd_norm', key="05_psd_cg",
+                                   title=f'klouzavý průměr s krokem {self.mov_filt_size}')
 
             # remove trend
             psd = self._detrend(freq_vals[i], psd)
-            self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
-                                  xlabel='', ylabel='psd', title='detrend psd')
 
             # remove negative values
             if self.rem_neg:
                 psd = self._remove_negative(psd)
-                self.conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
-                                      xlabel='freqency (Hz)', ylabel='psd', title='nonnegative psd')
+                self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                       xlabel='frekvence(Hz)', ylabel='psd_noneg', key="06_psd_noneg",
+                                       title='odstranění trendu a negativních hodnot')
 
             # remove everything lower than mode:
 #            psd = self._remove_below_mode(psd)
@@ -255,7 +312,7 @@ class Preprocessor:
 
         return freq_vals[0], psd_list, wind_dir, wind_spd
 
-    def conditional_plot(self, x, y, cond=False, ax=None, col=0, every=1, xlabel='x', ylabel='y', title='', scale="linear"):
+    def _conditional_plot(self, x, y, cond=False, ax=None, col=0, every=1, xlabel='x', ylabel='y', key='', title='', scale='linear'):
         """ Plots 'x' and 'y' to 'ax' as a line plot if 'cond' == True
             plot only when j % every == 0 (default 'every = 1' which means that every input is plotted if cond==True)
         """
@@ -267,6 +324,10 @@ class Preprocessor:
             ax[row, jj].set_ylabel(ylabel)
             ax[row, jj].set_title(title)
             ax[row, jj].set_yscale(scale)
+            if key in self.semiresults:
+                self.semiresults[key].append((x, y))
+            else:
+                self.semiresults[key] = [(x, y)]
 
         self.cplot_call += 1
 
@@ -475,15 +536,45 @@ class Preprocessor:
 
 if __name__ == '__main__':
 
-    autocorr = False
+    autocorr = True
     rem_neg = True
     plot_semiresults = True
     nmeas = 144
     every = 6
+    acc_idx = 0
+    plot_save_folder = f"./images/preprocessing/autocorr-{autocorr}/rem_neg-{rem_neg}/nmeas-{nmeas}/every-{every}/acc_idx-{acc_idx}/"
 
     p = Preprocessor(use_autocorr=autocorr, rem_neg=rem_neg)
 
     freqs, psd = p.run(["data/trening/neporuseno/2months/08072018_AccM.mat"], return_as="ndarray",
-                       plot_semiresults=plot_semiresults, every=every, nmeas=nmeas)
+                       plot_semiresults=plot_semiresults, every=every, nmeas=nmeas, savefolder=plot_save_folder)
+
+
+    time, norm_acc = p.semiresults["01_norm"][acc_idx]
+    _, td_filt_acc = p.semiresults["02_td_filt"][acc_idx]
+    time_corr, corr_acc = p.semiresults["03_autocorr"][acc_idx]
+    freqs_, psd_norm = p.semiresults["04_psd_norm"][acc_idx]
+    _, psd_cg = p.semiresults["05_psd_cg"][acc_idx]
+    _, psd_noneg = p.semiresults["06_psd_noneg"][acc_idx]
+
+    p.compare_arrs_with_psd(time, norm_acc, time, td_filt_acc,
+                            suptitle="Odstranění násobků 50 Hz",
+                            label1="norm_acc", label2="td_filt_acc",
+                            title1="časová oblast", title2="frekvenční oblast",
+                            savefolder=plot_save_folder)
+    p.compare_arrs_with_psd(time, td_filt_acc, time_corr, corr_acc,
+                            suptitle="Výpočet autokorelační funkce",
+                            label1="td_filt_acc", label2="corr_acc",
+                            title1="časová oblast", title2="frekvenční oblast",
+                            savefolder=plot_save_folder)
+
+    p.compare_arrs(freqs_, psd_norm, freqs_, psd_cg,
+                   title=f"Klouzavý průměr s krokem {p.mov_filt_size}",
+                   label1="psd_norm", label2="psd_cg",
+                   savefolder=plot_save_folder)
+    p.compare_arrs(freqs_, psd_cg, freqs_, psd_noneg,
+                   title=f"Odstranění trendu a ořez hodnot",
+                   label1="psd_cg", label2="psd_noneg",
+                   savefolder=plot_save_folder)
 
     plt.show()
