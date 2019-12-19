@@ -29,8 +29,8 @@ if __name__ == '__main__':
     paths_undamaged = [os.path.join(folder, file) for folder, _, files in undamaged_gen for file in files]
     paths_damaged = [os.path.join(folder, file) for folder, _, files in damaged_gen for file in files]
 
-    print(paths_damaged)
     print(paths_undamaged)
+    print(paths_damaged)
 
     preprocessor = Preprocessor(use_autocorr=FLAGS.preprocessing["use_autocorr"],
                                 rem_neg=FLAGS.preprocessing["rem_neg"])

@@ -360,19 +360,19 @@ class Preprocessor:
 
     @staticmethod
     def _autocorr(arr):
-        """ calculate autocorrelation function from the array (arr) to reduce noise
+        """ calculate autocorrelation function (ACF) from the array (arr) to reduce noise
             inspired by http://dsp.vscht.cz/konference_matlab/MATLAB09/prispevky/079_pavlik.pdf
         """
-        N = arr.shape[0]  # počet vzorků signálu
-        nmeas = arr.shape[1]  # počet měření
+        N = arr.shape[0]  # number of signal samples
+        nmeas = arr.shape[1]  # number of measurements
 
         Rrr = np.zeros((N-1, nmeas))
 
         for i in range(nmeas):
             a = arr[:, i]
-            XX = hankel(a[1:])  # vytvoření hankelovy matice z prvků a[1] až a[N-1] (horní levá trojúhelníková matice)
-            vX = a[:-1]  # vektor a[0] až a[N-2]
-            Rrr[:, i] = np.matmul(XX, vX) / N - a.mean() ** 2  # výpočet normalizované ACF
+            XX = hankel(a[1:])  # create hankel matrix from a[1] to a[N-1] (upper left triangular matrix)
+            vX = a[:-1]  # vector a[0] to a[N-2]
+            Rrr[:, i] = np.matmul(XX, vX) / N - a.mean() ** 2  # calculate normalized ACF
         return Rrr
 
     def _make_bandstop_filters(self):
@@ -393,7 +393,7 @@ class Preprocessor:
         return nums, denoms
 
     def _apply_time_domain_filters(self, arr):
-        """apply all calculated bandstop filteres on arr"""
+        """ apply all calculated bandstop filteres on arr """
         nfilts = self.nums.shape[0]
 
         for i in range(arr.shape[-1]):
@@ -403,7 +403,7 @@ class Preprocessor:
 
     @staticmethod
     def _hamming(arr):
-        """Apply Hamming window across the 0th dimension in arr"""
+        """ Apply Hamming window across the 0th dimension in arr """
         return (arr.T*np.hamming(arr.shape[0])).T
 
     def _calc_psd(self, arr):
@@ -477,28 +477,6 @@ class Preprocessor:
 
         return psd_arr_cg
 
-    def _remove_negative(self, psd_arr):
-        """
-        Remove negative values from psd
-
-        :param psd_arr: array of power spectral densities [nfft, :]
-        :return: psd_arr_positive
-        """
-        return psd_arr.clip(min=0)
-
-    def _remove_below_mode(self, psd_arr):
-        """
-        Remove everything below mode
-
-        :param psd_arr:
-        :return: psd_arr_clipped
-        """
-
-        hist = np.histogram(psd_arr, 100)
-        mode = hist[1][int(np.argmax(hist[0]))]
-
-        return psd_arr.clip(min=mode)
-
     def _detrend(self, freqs, psd_arr):
         """
         Remove linear trend from y=psd_arr(x) based on Least Squares optimized curve fitting
@@ -525,6 +503,28 @@ class Preprocessor:
 
         return psd_arr_detrended
 
+    def _remove_negative(self, psd_arr):
+        """
+        Remove negative values from psd
+
+        :param psd_arr: array of power spectral densities [nfft, :]
+        :return: psd_arr_positive
+        """
+        return psd_arr.clip(min=0)
+
+    def _remove_below_mode(self, psd_arr):
+        """
+        Remove everything below mode
+
+        :param psd_arr:
+        :return: psd_arr_clipped
+        """
+
+        hist = np.histogram(psd_arr, 100)
+        mode = hist[1][int(np.argmax(hist[0]))]
+
+        return psd_arr.clip(min=mode)
+
     @staticmethod
     def __error_func(par, x, y, func):
         return np.square(y - func(par, x))
@@ -539,7 +539,7 @@ if __name__ == '__main__':
     autocorr = True
     rem_neg = True
     plot_semiresults = True
-    nmeas = 144
+    nmeas = 1
     every = 6
     acc_idx = 0
     plot_save_folder = f"./images/preprocessing/autocorr-{autocorr}/rem_neg-{rem_neg}/nmeas-{nmeas}/every-{every}/acc_idx-{acc_idx}/"
@@ -575,6 +575,10 @@ if __name__ == '__main__':
     p.compare_arrs(freqs_, psd_cg, freqs_, psd_noneg,
                    title=f"Odstranění trendu a ořez hodnot",
                    label1="psd_cg", label2="psd_noneg",
+                   savefolder=plot_save_folder)
+
+    p.compare_arrs(freqs_, psd_noneg, 0, 0, title=f"Výstupní výkonová spektrální hustota singálu",
+                   label1="psd_noneg", label2="",
                    savefolder=plot_save_folder)
 
     plt.show()

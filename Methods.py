@@ -228,6 +228,13 @@ class M2(Method):
         self.trained_distributions = None
 
     def train(self, path, bin_sizes, thresholds):
+        """ calculate binarized distributions of PSD from path for each combination of bin_size and threshold nd then save them for further use
+
+        :param path: path to file(s) containing psd arrays for training
+        :param bin_sizes: tuple of desired bin sizes
+        :param thresholds: tuple of desired thresholds
+        :return: None
+        """
 
         self.bin_sizes = bin_sizes
         self.thresholds = thresholds
@@ -237,6 +244,16 @@ class M2(Method):
         print("Training complete!")
 
     def compare(self, path, period=None, print_results=True):
+        """ Calculate cross entropy between psd loaded from path and trained multiscale distributions (M2().train).
+        If period is specified, the compared psd files will first be split by days (e.g. period=1 means that ce will be
+        calculated for each day of psd_comp sepparately)
+
+        :param path: path to file(s) containing psd arrays for comparison with training data
+        :param period: (int) split the comparison into periods of days (None==period is same as length of the data)
+        :param print_results: (int)
+        :return ce: array of cross entropies for each threshold, bin_size and period
+        """
+
 
         if not self.trained_distributions:
             raise(ValueError, "Nejdříve je třeba metodu natrénovat (M2().train).")
@@ -260,7 +277,7 @@ class M2(Method):
 
         return ce
 
-    def get_multiscale_distributions(self, path, bin_sizes=(10, ), thresholds=(0.1, ), period=None):
+    def get_multiscale_distributions(self, path, bin_sizes=(10, ), thresholds=(0.1, ), period=None, plot=False):
         """
 
         :return multiscale_distributions: List[(1, 1), 1D array[nbins], 2D array[naccs, nbins]]
@@ -270,7 +287,7 @@ class M2(Method):
 
         multiscale_distributions = list()
 
-        for mean, var in zip(PSD, PSD_var):
+        for i, (mean, var) in enumerate(zip(PSD, PSD_var)):
             if self.var_scaled_PSD:
                 var = (var - var.min())/(var.max() - var.min())  # normalize to interval (0, 1)
                 mean = mean*var
@@ -293,23 +310,23 @@ class M2(Method):
 
     @staticmethod
     def _cross_entropy(d1, d2):
-        """
+        """ Calculate information cross-entropy between d1 and d2
 
         :param d1: distribution 1
         :param d2: distribution 2
-        :return: -sum(d1(x).log(d2(x)))
+        :return: -sum(d1(x).log2(d2(x)))
         """
 
-        return -np.sum(d1*np.log(d2))
+        return -np.sum(d1*np.log2(d2))
 
 
     @staticmethod
     def _split_to_bins(freqs, psd_array, bin_size):
-        """Vezme pole psd_array a rozdělí ho na košíky (podle frekvence).
+        """Take psd_array and split it into bins (frequency-wise).
 
-        :param freqs: vstupní pole hodnot frekvencí [počet hodnot na frekvenční ose, ]
-        :param psd_array: vstupní pole psd hodnot (počet měření, počet hodnot na frekvenční ose)
-        :param bin_size: (int) požadovaná velikost košíku (počet hodnot NE frekvence)
+        :param freqs: array of input frequencies [number of frequencies, ]
+        :param psd_array: array of input psd values [number of measurements, number of frequencies]
+        :param bin_size: (int) desired bin size in number of values (not frequencies)
 
         :return freq_bins (2D array) [počet binů, velikost jednoho binu]
                 psd_bins: (3D array) [počet měření, počet binů, počet frekvencí v jednom binu]
@@ -336,12 +353,12 @@ class M2(Method):
         :param threshold: (int) desired cutoff value for binarization
         :return psd_binarized_softmaxed: (2D array) [:, nbins]
         """
-
         psd_binarized = np.array(psd_bins > threshold, dtype=np.float32)
 
         psd_binarized_sum = psd_binarized.sum(axis=-1)
+        psd_sum_of_exp = np.exp(psd_binarized_sum).sum(axis=-1)
 
-        psd_binarized_softmaxed = np.exp(psd_binarized_sum)/np.expand_dims(np.exp(psd_binarized_sum).sum(axis=-1), 1)
+        psd_binarized_softmaxed = np.exp(psd_binarized_sum)/np.expand_dims(psd_sum_of_exp, 1)
 
         return psd_binarized_softmaxed
 
@@ -388,8 +405,8 @@ if __name__ == '__main__':
     m2 = M2(preprocessor, var_scaled_PSD=var_scaled_PSD)
 
     # multiscale params
-    bin_sizes = (10, 20, 40, 80)
-    thresholds = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7)
+    bin_sizes = (5, )
+    thresholds = (0.1, 0.2)
     plot_distributions = False
 
     # Train the method on 2 months of neporuseno
@@ -411,7 +428,6 @@ if __name__ == '__main__':
             if val > daily_best:
                 daily_best = val
                 best_j = j
-                # TODO: bin statistics
         print(f"day: {i}, bs: {bin_sizes[best_j%nbins]}, th: {thresholds[best_j%nth]} val: {daily_best}")
 
     distributions_1 = m2.get_multiscale_distributions(paths[0], bin_sizes=bin_sizes, thresholds=thresholds)
@@ -430,10 +446,19 @@ if __name__ == '__main__':
     if plot_distributions:
         for j, dist in enumerate((distributions_1, distributions_2, distributions_3)):
             for (params, freqs, d) in dist:
-                fig, axes = plt.subplots(3, 2)
+                nrows = 1
+                ncols = 1
+                fig, axes = plt.subplots(nrows, ncols)
+                if nrows+ncols == 2:
+                    axes = np.array([axes])
                 for i, ax in enumerate(axes.flatten()):
-                    ax.semilogy(freqs, d[i, :])
-                fig.suptitle(f"{dataset[j]} | {params} |")
-        plt.show()
+                    y_pos = np.arange(len(d[i, :]))
+                    ax.bar(y_pos, d[i, :], align="center", width=0.9)
+                    ax.set_xticks(np.arange(0, freqs.max(), 50))
+                    ax.set_xlabel("frekvence (Hz)")
+                    ax.set_ylabel("Softmax(psd_binarized) (1)")
+                    ax.set_yscale("log")
+                fig.suptitle(f"Binarizované spektrum {dataset[j]} | bs: {params[0]} | th: {params[1]} |")
+    plt.show()
 
     # ------------------------------------------------------------------------------------------------------------------

@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     # multiscale params
     bin_sizes = (80, )
-    thresholds = (0.1, 0.2, 0.5)
+    thresholds = (.001, .01, .1, .2, .5, )
     plot_distributions = False
 
     # Train the method on 2 months of neporuseno
@@ -67,14 +67,6 @@ if __name__ == "__main__":
     ce2 = m2.compare(paths[1], period=1, print_results=False)
     ce3 = m2.compare(paths[2], period=1, print_results=False)
     ce23 = np.vstack((ce2, ce3))
-
-    # NORMALIZACE podle ce23???
-#    ce2 = (ce2 - ce23.mean())/ce23.std()
-#    ce3 = (ce3 - ce23.mean())/ce23.std()
-
-
-
-    print(ce23.shape)
 
     ce2_diff = np.diff(ce2, axis=0)
     ce3_diff = np.diff(ce3, axis=0)
@@ -105,4 +97,6 @@ if __name__ == "__main__":
     plt.ylabel("kumulativní křížová entropie")
     plt.title("Porovnání kumulativních křížových entropií")
     plt.legend()
+
+    plt.savefig("../images/M2/cummul_ce.pdf")
     plt.show()
