@@ -213,11 +213,6 @@ class M1(Method):
 
 class M2(Method):
 
-    # rozdělit na biny
-    # najít, které frekvence jsou vybuzené a které ne (multiscale threshold)
-    # spočítat počet vybuzených
-    # výpočet křížové entropie
-
     def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, var_scaled_PSD=False):
         super(M2, self).__init__(preprocessor, from_existing_file=from_existing_file)
 
@@ -277,9 +272,14 @@ class M2(Method):
 
         return ce
 
-    def get_multiscale_distributions(self, path, bin_sizes=(10, ), thresholds=(0.1, ), period=None, plot=False):
-        """
+    def get_multiscale_distributions(self, path, bin_sizes=(10, ), thresholds=(0.1, ), period=None):
+        """ Calculate multiscale distributions from files given in path for each combination of values in
+        bin_sizes and thresholds.
 
+        :param path: path to files with psd files
+        :param bin_sizes: tuple with desired bin sizes
+        :param thresholds: tuple with desired thresholds
+        :param period: period with which to calculate the distributions
         :return multiscale_distributions: List[(1, 1), 1D array[nbins], 2D array[naccs, nbins]]
         """
 
@@ -328,8 +328,8 @@ class M2(Method):
         :param psd_array: array of input psd values [number of measurements, number of frequencies]
         :param bin_size: (int) desired bin size in number of values (not frequencies)
 
-        :return freq_bins (2D array) [počet binů, velikost jednoho binu]
-                psd_bins: (3D array) [počet měření, počet binů, počet frekvencí v jednom binu]
+        :return freq_bins (2D array) [number of bins, size of one bin]
+                psd_bins: (3D array) [number of measurements, number of bins, size of one bin]
         """
         naccs, nfreqs = psd_array.shape
 
@@ -347,7 +347,7 @@ class M2(Method):
 
     @staticmethod
     def _binarize_and_softmax(psd_bins, threshold):
-        """
+        """ Calculate binarized values in bins scaled by softmax to probability distribution with sum of 1
 
         :param psd_bins: (3D array) psd array which is split to bins [:, nbins, bin_size]
         :param threshold: (int) desired cutoff value for binarization
