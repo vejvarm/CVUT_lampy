@@ -7,7 +7,6 @@ from Methods import M2
 import numpy as np
 from matplotlib import pyplot as plt
 
-# TODO: bin statistics
 
 def calc_periodic_best(ce, bin_sizes, thresholds):
     nperiods, nparams = ce.shape
@@ -26,6 +25,7 @@ def calc_periodic_best(ce, bin_sizes, thresholds):
         print(f"day: {i}, bs: {bin_sizes[best_params[i][0]]}, th: {thresholds[best_params[i][1]]} val: {periodic_best[i]}")
     return best_params, periodic_best
 
+
 def linear_regression(y, x=None):
     """Calculate params of a line (a, b) using least squares algorithm to best fit the input data (x, y)"""
     ndata = len(y)
@@ -37,15 +37,16 @@ def linear_regression(y, x=None):
     a, b = np.linalg.lstsq(A, y, rcond=None)[0]
     return a, b
 
+
 if __name__ == "__main__":
     setting = "training"
     folder = FLAGS.paths[setting]["folder"]
     dataset = FLAGS.paths[setting]["dataset"]
     period = [FLAGS.paths[setting]["period"]]*len(dataset)
     filename = ["X.npy"]*len(dataset)
-    paths = [f"../{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
-#    paths[1] = f"../data/validace/neporuseno/X.npy"
-#    paths[2] = f"../data/validace/poruseno/X.npy"
+    paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
+#    paths[1] = f"./data/validace/neporuseno/X.npy"
+#    paths[2] = f"./data/validace/poruseno/X.npy"
 
     print(paths)
 
@@ -98,5 +99,5 @@ if __name__ == "__main__":
     plt.title("Porovnání kumulativních křížových entropií")
     plt.legend()
 
-    plt.savefig("../images/M2/cummul_ce.pdf")
+    plt.savefig("./images/M2/cummul_ce.pdf")
     plt.show()

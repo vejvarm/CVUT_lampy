@@ -1,6 +1,3 @@
-# short/long time averaging
-# TODO: plotting
-
 import numpy as np
 
 from matplotlib import pyplot as plt

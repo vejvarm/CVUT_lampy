@@ -77,5 +77,3 @@ if __name__ == '__main__':
     plt.scatter(data_2D_new[:, 0], data_2D_new[:, 1], marker='o', edgecolors='blue')
     plt.scatter(data_2D_old[:, 0], data_2D_old[:, 1], marker='x', edgecolors='red')
     plt.show()
-
-# TODO: každé zrychlení zvlášť?

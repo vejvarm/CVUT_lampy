@@ -14,7 +14,6 @@ def signaltonoise(a, axis=0, ddof=0):
     return np.where(sd == 0, 0, m/sd)
 
 
-# TODO: load saved excited and unexcited arrays from files if they exist
 if __name__ == '__main__':
     root = "D:/!private/Lord/Git/CVUT_lampy"
     datasets = ["neporuseno", "neporuseno2", "poruseno"]

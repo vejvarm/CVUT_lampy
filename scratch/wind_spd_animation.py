@@ -1,5 +1,3 @@
-# TODO: graf větru inicializovat již s hodnotami a poté jen měnit barvu v okolí aktuálního 'j'
-
 import numpy as np
 
 from matplotlib import pyplot as plt

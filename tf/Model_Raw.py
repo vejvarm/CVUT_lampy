@@ -127,10 +127,6 @@ def build_model(input_shape, nfilters, kernel_sizes, strides, drop_rates, activa
     return model
 
 
-# TODO: TFRecord datasets
-# TODO: Implement GridSearchCV
-
-
 if __name__ == '__main__':
     # PARAMS
     nclasses = 2
@@ -186,8 +182,6 @@ if __name__ == '__main__':
 
     # save model architecture for future loading
     model.save(result_dir+"model")
-
-    # TODO: GRID SEARCH
 
     # define callbacks
     reduce_lr = ReduceLROnPlateau(monitor="val_accuracy", min_lr=min_lr)

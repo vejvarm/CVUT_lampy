@@ -1,5 +1,3 @@
-# TODO: implement scipy.optimize.leastsq
-
 import numpy as np
 
 from scipy.optimize import leastsq

@@ -1,13 +1,3 @@
-# normalizace -- calc_zscore
-# hammingovo okno před FFT
-# fft (Nfft = 5120) -- calc_psd
-# odstranění druhé poloviny spektra (zrcadlově symetrické s první polovinou)
-# odstranění násobků 50 Hz (el.mag. rušení)
-# vyhladit plovoucím průměrem (coarse graining) --- průměr z okolních hodnot
-# odstranění trendů (0 - 50 Hz, 0 - 100 Hz)
-# TODO: kratší data s křížovou entropií
-# TODO: zpráva na fungující křížovou entropii
-
 import os
 from copy import deepcopy
 
