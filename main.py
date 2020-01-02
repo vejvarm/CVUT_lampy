@@ -39,65 +39,66 @@ def linear_regression(y, x=None):
 
 
 if __name__ == "__main__":
+    # Paths to files
     setting = "training"
     folder = FLAGS.paths[setting]["folder"]
     dataset = FLAGS.paths[setting]["dataset"]
     period = [FLAGS.paths[setting]["period"]]*len(dataset)
     filename = ["X.npy"]*len(dataset)
     paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
-#    paths[1] = f"./data/validace/neporuseno/X.npy"
-#    paths[2] = f"./data/validace/poruseno/X.npy"
-
-    print(paths)
-
-    preprocessor = Preprocessor()
-
     from_existing_file = True
-    var_scaled_PSD = False
-
-    m2 = M2(preprocessor, var_scaled_PSD=var_scaled_PSD)
 
     # multiscale params
     bin_sizes = (80, )
     thresholds = (.001, .01, .1, .2, .5, )
     plot_distributions = False
 
-    # Train the method on 2 months of neporuseno
+    # periodic params
+    ndays = 60
+    period = 1
+
+    # define instance of Preprocessor and initialize M2
+    preprocessor = Preprocessor()
+    m2 = M2(preprocessor, from_existing_file=from_existing_file)
+
+    # Train the method on 2 months of neporuseno (trained)
     m2.train(paths[0], bin_sizes, thresholds)
 
-    ce2 = m2.compare(paths[1], period=1, print_results=False)
-    ce3 = m2.compare(paths[2], period=1, print_results=False)
+    # Calculate cross entropy of
+    ce2 = m2.compare(paths[1], period=period, print_results=False)  # trained with neporuseno2
+    ce3 = m2.compare(paths[2], period=period, print_results=False)  # trained with poruseno
     ce23 = np.vstack((ce2, ce3))
-
-    ce2_diff = np.diff(ce2, axis=0)
-    ce3_diff = np.diff(ce3, axis=0)
-    ce23_diff = np.diff(ce23, axis=0)
     # print(ce2.shape)  # (nperiods, nbins*nthresholds)
 
-    ce2_best_params, ce2_periodic_best = calc_periodic_best(ce2, bin_sizes, thresholds)  # ce2_diff lepší pro valid data
-    ce3_best_params, ce3_periodic_best = calc_periodic_best(ce3, bin_sizes, thresholds)  # ce3_diff lepší pro valid data
+    # Find the highest cross-entropy for each day
+    ce2_best_params, ce2_periodic_best = calc_periodic_best(ce2, bin_sizes, thresholds)
+    ce3_best_params, ce3_periodic_best = calc_periodic_best(ce3, bin_sizes, thresholds)
 
+    # Count which and how many times have combinations of (bin_size, threshold) been chosen as highest ce
     ce2_best_js = Counter(ce2_best_params)
     ce3_best_js = Counter(ce3_best_params)
     print(ce2_best_js)
     print(ce3_best_js)
 
-    ndays = 60
+    # Calculate cummulative sum of cross-entropies
     x = np.arange(0, len(ce2_periodic_best), 1)[:ndays]
     y2 = np.cumsum(ce2_periodic_best)[:ndays]
     y3 = np.cumsum(ce3_periodic_best)[:ndays]
 
+    # Calculate params for linear regressions
     a2, b2 = linear_regression(y2, x)
     a3, b3 = linear_regression(y3, x)
 
+    # plot the results of cummulative cross-entropies and their regression
     plt.plot(x, a2*x + b2, "b", label=f"regrese neporušených dat (a={a2:.1f}, b={b2:.1f})")
     plt.plot(x, a3*x + b3, "r", label=f"regrese porušených dat (a={a3:.1f}, b={b3:.1f})")
     plt.stem(y2, markerfmt="bx", linefmt="none", use_line_collection=True, label="neporušená lampa")
     plt.stem(y3, markerfmt="r+", linefmt="none", use_line_collection=True, label="porušená lampa")
-    plt.xlabel("perioda (den)")
+    plt.xlabel(f"perioda ({period} " + ("den" if period == 1 else "dnů") + ")")
     plt.ylabel("kumulativní křížová entropie")
     plt.title("Porovnání kumulativních křížových entropií")
     plt.legend()
 
-    plt.savefig("./images/M2/cummul_ce.pdf")
+    # save the resulting plot
+    plt.savefig(f"./images/M2/cummul_ce_nd-{ndays}_p-{period}.pdf")
     plt.show()
