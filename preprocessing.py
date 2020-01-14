@@ -351,7 +351,6 @@ class Preprocessor:
     @staticmethod
     def _autocorr(arr):
         """ calculate autocorrelation function (ACF) from the array (arr) to reduce noise
-            inspired by http://dsp.vscht.cz/konference_matlab/MATLAB09/prispevky/079_pavlik.pdf
         """
         N = arr.shape[0]  # number of signal samples
         nmeas = arr.shape[1]  # number of measurements
@@ -360,9 +359,12 @@ class Preprocessor:
 
         for i in range(nmeas):
             a = arr[:, i]
-            XX = hankel(a[1:])  # create hankel matrix from a[1] to a[N-1] (upper left triangular matrix)
-            vX = a[:-1]  # vector a[0] to a[N-2]
-            Rrr[:, i] = np.matmul(XX, vX) / N - a.mean() ** 2  # calculate normalized ACF
+            a = np.fft.ifftshift((a - a.mean())/a.std())  # standardize and shift center to middle
+            a = np.pad(a, (N//2, N//2), mode="constant")  # pad with zeros to simulate periodicity for FFT
+            A = np.fft.fft(a)  # convert to frequency domain
+            AA = np.abs(A)**2  # calculate autocorrelation in the frequency domain
+            aa = np.fft.ifft(AA)[:N:-1]  # convert back to time domain and take only the relevant half of the signal
+            Rrr[:, i] = np.real(aa)/N - a.mean()**2  # save normalized autocorrelation function value
         return Rrr
 
     def _make_bandstop_filters(self):
