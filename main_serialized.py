@@ -7,6 +7,7 @@ from Methods import M2
 import numpy as np
 from matplotlib import pyplot as plt
 
+# TODO: korelace mezi sílou větru, rychlostí větru a amplitudou (vybuzeností) vlastních frekvencí
 
 def calc_periodic_best(ce, bin_sizes, thresholds):
     nperiods, nparams = ce.shape
@@ -39,23 +40,35 @@ def linear_regression(y, x=None):
 
 
 if __name__ == "__main__":
-    # Paths to files
+    # Paths to training files
     setting = "training"
     folder = FLAGS.paths[setting]["folder"]
     dataset = FLAGS.paths[setting]["dataset"]
     period = [FLAGS.paths[setting]["period"]]*len(dataset)
-    filename = ["X_l2.npy"]*len(dataset)
+    filename = ["X_l0.npy"]*len(dataset)
     paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
+
+    # Paths to validation files
+    setting_valid = "serialized"
+    folder = FLAGS.paths[setting_valid]["folder"]
+    dataset = FLAGS.paths[setting_valid]["dataset"]
+    period = [FLAGS.paths[setting_valid]["period"]]*len(dataset)
+    filename = ["X_l2.npy"] * len(dataset)
+    paths_valid = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
+
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (80, )
-    thresholds = (.001, .01, .1, .2, .5, )
+    bin_sizes = (10, 20, 80, )
+    thresholds = (.01, .1, )
     plot_distributions = False
 
     # periodic params
-    ndays = 60
-    period = 1
+    period = 7
+    ndays_unbroken = FLAGS.serialized["unbroken"]//period
+    ndays_broken = FLAGS.serialized["broken"]//period
+    ndays = ndays_unbroken + ndays_broken
+
 
     # define instance of Preprocessor and initialize M2
     preprocessor = Preprocessor()
@@ -65,39 +78,37 @@ if __name__ == "__main__":
     m2.train(paths[0], bin_sizes, thresholds)
 
     # Calculate cross entropy of
-    ce2 = m2.compare(paths[1], period=period, print_results=False)  # trained with neporuseno2
-    ce3 = m2.compare(paths[2], period=period, print_results=False)  # trained with poruseno
-    ce23 = np.vstack((ce2, ce3))
+    ce23 = m2.compare(paths_valid[0], period=period, print_results=False)  # compared with neporuseno2
     # print(ce2.shape)  # (nperiods, nbins*nthresholds)
 
     # Find the highest cross-entropy for each day
-    ce2_best_params, ce2_periodic_best = calc_periodic_best(ce2, bin_sizes, thresholds)
-    ce3_best_params, ce3_periodic_best = calc_periodic_best(ce3, bin_sizes, thresholds)
+    ce23_best_params, ce23_periodic_best = calc_periodic_best(ce23, bin_sizes, thresholds)
 
     # Count which and how many times have combinations of (bin_size, threshold) been chosen as highest ce
-    ce2_best_js = Counter(ce2_best_params)
-    ce3_best_js = Counter(ce3_best_params)
-    print(ce2_best_js)
-    print(ce3_best_js)
+    ce23_best_js = Counter(ce23_best_params)
 
     # Calculate cummulative sum of cross-entropies
-    x = np.arange(0, len(ce2_periodic_best), 1)[:ndays]
-    y2 = np.cumsum(ce2_periodic_best)[:ndays]
-    y3 = np.cumsum(ce3_periodic_best)[:ndays]
+    x23 = np.arange(0, len(ce23_periodic_best), 1)[:ndays]
+    x2 = x23[:ndays_unbroken]
+    x3 = x23[ndays_unbroken:]
+    y23 = np.cumsum(ce23_periodic_best)[:ndays]
+    y2 = y23[:ndays_unbroken]
+    y3 = y23[ndays_unbroken:]
 
     # Calculate params for linear regressions
-    a2, b2 = linear_regression(y2, x)
-    a3, b3 = linear_regression(y3, x)
+    a2, b2 = linear_regression(y2, x2)
+    a23, b23 = linear_regression(y23, x23)
 
     # plot the results of cummulative cross-entropies and their regression
-    plt.plot(x, a2*x + b2, "b", label=f"regrese neporušených dat (a={a2:.1f}, b={b2:.1f})")
-    plt.plot(x, a3*x + b3, "r", label=f"regrese porušených dat (a={a3:.1f}, b={b3:.1f})")
-    plt.stem(y2, markerfmt="bx", linefmt="none", use_line_collection=True, label="neporušená lampa")
-    plt.stem(y3, markerfmt="r+", linefmt="none", use_line_collection=True, label="porušená lampa")
+    plt.plot(x23, a2*x23 + b2, "b", label=f"regrese bez porušených dat (a={a2:.1f}, b={b2:.1f})")
+    plt.plot(x23, a23*x23 + b23, "r", label=f"regrese s porušenými daty (a={a23:.1f}, b={b23:.1f})")
+    plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label="neporušená lampa")
+    plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label="porušená lampa")
     plt.xlabel(f"perioda ({period} " + ("den" if period == 1 else "dnů") + ")")
     plt.ylabel("kumulativní křížová entropie")
     plt.title("Porovnání kumulativních křížových entropií")
     plt.legend()
+    plt.grid()
 
     # save the resulting plot
     plt.savefig(f"./images/M2/cummul_ce_nd-{ndays}_p-{period}.pdf")

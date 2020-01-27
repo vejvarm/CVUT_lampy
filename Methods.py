@@ -58,7 +58,7 @@ class Method:
         path_to_vars = folder_path + "/PSDvar.npy"
 
         try:
-            if self.from_existing_file and "X.npy" in path:
+            if self.from_existing_file and "X" in path and ".npy" in path:
                 nlamps = FLAGS.nlamps
                 freqs, X = self.preprocessor.run([path], return_as="ndarray")
 
@@ -285,6 +285,8 @@ class M2(Method):
 
         freqs, PSD, PSD_var = self._get_PSD(path, period)
 
+        print(PSD.shape)
+
         multiscale_distributions = list()
 
         for i, (mean, var) in enumerate(zip(PSD, PSD_var)):
@@ -356,6 +358,7 @@ class M2(Method):
         psd_binarized = np.array(psd_bins > threshold, dtype=np.float32)
 
         psd_binarized_sum = psd_binarized.sum(axis=-1)
+        psd_binarized_sum = (psd_binarized_sum - psd_binarized_sum.mean())/psd_binarized_sum.std()
         psd_sum_of_exp = np.exp(psd_binarized_sum).sum(axis=-1)
 
         psd_binarized_softmaxed = np.exp(psd_binarized_sum)/np.expand_dims(psd_sum_of_exp, 1)
