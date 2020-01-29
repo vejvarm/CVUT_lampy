@@ -45,7 +45,7 @@ if __name__ == "__main__":
     folder = FLAGS.paths[setting]["folder"]
     dataset = FLAGS.paths[setting]["dataset"]
     period = [FLAGS.paths[setting]["period"]]*len(dataset)
-    filename = ["X_l0.npy"]*len(dataset)
+    filename = ["X_l2.npy"]*len(dataset)
     paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
 
     # Paths to validation files
@@ -59,12 +59,12 @@ if __name__ == "__main__":
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (10, 20, 80, )
-    thresholds = (.01, .1, )
+    bin_sizes = (10, 20, 40, 80,)
+    thresholds = (0.1, 1., 10.)
     plot_distributions = False
 
     # periodic params
-    period = 7
+    period = 1
     ndays_unbroken = FLAGS.serialized["unbroken"]//period
     ndays_broken = FLAGS.serialized["broken"]//period
     ndays = ndays_unbroken + ndays_broken

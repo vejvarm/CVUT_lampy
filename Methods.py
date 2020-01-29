@@ -285,8 +285,6 @@ class M2(Method):
 
         freqs, PSD, PSD_var = self._get_PSD(path, period)
 
-        print(PSD.shape)
-
         multiscale_distributions = list()
 
         for i, (mean, var) in enumerate(zip(PSD, PSD_var)):

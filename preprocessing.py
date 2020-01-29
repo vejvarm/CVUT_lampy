@@ -30,7 +30,7 @@ class Preprocessor:
                  freq_range=(0, 256),
                  tdf_order=5,
                  tdf_ranges=((45, 55), (95, 105), (145, 155), (195, 205)),
-                 use_autocorr = True,
+                 use_autocorr=True,
                  noise_f_rem=(0, ),
                  noise_df_rem=(0, ),
                  mov_filt_size=5,

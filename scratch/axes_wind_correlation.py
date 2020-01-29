@@ -11,6 +11,8 @@ def abs_diff(x, y):
 def normalize(x):
     return (x - x.min())/(x.max() - x.min())
 
+# TODO: časový vývoj!
+
 
 if __name__ == '__main__':
     settings = ["training", "serialized"]
@@ -37,7 +39,7 @@ if __name__ == '__main__':
             plt.stem(X_l0_m[:, 0], X_l0_m[:, 1], use_line_collection=True, basefmt=" ", markerfmt="or", linefmt="none")
             plt.stem(X_l1_m[:, 0], X_l1_m[:, 1], use_line_collection=True, basefmt=" ", markerfmt="xg", linefmt="none")
             plt.stem(X_l2_m[:, 0], X_l2_m[:, 1], use_line_collection=True, basefmt=" ", markerfmt="+b", linefmt="none")
-            plt.plot([0, 2.], [0, 2.])
+            plt.plot([0, 3.], [0, 3.])
 
             # plotting differences between values of sensor axes
             fig, ax = plt.subplots(3, 1)
