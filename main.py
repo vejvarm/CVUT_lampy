@@ -44,14 +44,14 @@ if __name__ == "__main__":
     folder = FLAGS.paths[setting]["folder"]
     dataset = FLAGS.paths[setting]["dataset"]
     period = [FLAGS.paths[setting]["period"]]*len(dataset)
-    filename = ["X_l2.npy"]*len(dataset)
+    filename = ["X.npy"]*len(dataset)
     paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (80, )
-    thresholds = (.001, .01, .1, .2, .5, )
-    plot_distributions = False
+    bin_sizes = (160, )
+    thresholds = (.01, )
+    plot_distributions = True
 
     # periodic params
     ndays = 60
@@ -101,4 +101,22 @@ if __name__ == "__main__":
 
     # save the resulting plot
     plt.savefig(f"./images/M2/cummul_ce_nd-{ndays}_p-{period}.pdf")
+
+    # if plot distributions:
+    if plot_distributions:
+        for j, dist in enumerate((m2.trained_distributions, )):
+            for params, freqs, d in dist:
+                nrows = 1
+                ncols = 1
+                fig, axes = plt.subplots(nrows, ncols)
+                if nrows+ncols == 2:
+                    axes = np.array([axes])
+                for i, ax in enumerate(axes.flatten()):
+                    y_pos = np.arange(len(d[i, :]))
+                    ax.bar(y_pos, d[i, :], align="center", width=0.9)
+                    ax.set_xlabel("košík (bin)")
+                    ax.set_ylabel("Softmax(psd_binarized) (1)")
+                    ax.set_yscale("log")
+                fig.suptitle(f"Binarizované spektrum {dataset[j]} | bs: {params[0]} | th: {params[1]} |")
+
     plt.show()

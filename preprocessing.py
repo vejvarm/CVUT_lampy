@@ -138,6 +138,26 @@ class Preprocessor:
         else:
             raise AttributeError("return_as should be either 'dict' or 'ndarray'")
 
+    def simple_preprocess(self, arr):
+        """
+
+        :param arr: (nsamples, nmeas) 2D float array
+        :return: preprocessed psd
+        """
+
+        arr = self._calc_zscore(arr)
+        arr = self._apply_time_domain_filters(arr)
+        if self.use_autocorr:
+            arr = self._autocorr(arr)
+        freq_vals, psd = self._calc_psd(arr)
+        psd = (psd - psd.mean()) / psd.std()
+        psd = self._coarse_grain(psd)
+        psd = self._detrend(freq_vals, psd)
+        if self.rem_neg:
+            psd = self._remove_negative(psd)
+
+        return freq_vals, psd
+
     @staticmethod
     def compare_arrs(x1, y1, x2, y2, title="Porovnání dvou vstupních polí.",
                               label1="y1", label2="y2", savefolder=None):

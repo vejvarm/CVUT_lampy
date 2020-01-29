@@ -455,7 +455,7 @@ if __name__ == '__main__':
                 for i, ax in enumerate(axes.flatten()):
                     y_pos = np.arange(len(d[i, :]))
                     ax.bar(y_pos, d[i, :], align="center", width=0.9)
-                    ax.set_xticks(np.arange(0, freqs.max(), 50))
+#                    ax.set_xticks(np.arange(0, freqs.max(), 50))
                     ax.set_xlabel("frekvence (Hz)")
                     ax.set_ylabel("Softmax(psd_binarized) (1)")
                     ax.set_yscale("log")
