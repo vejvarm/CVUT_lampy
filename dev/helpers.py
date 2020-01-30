@@ -22,7 +22,7 @@ def console_logger(name="__main__", level=logging.WARNING):
     if logger.hasHandlers():
         logger.handlers.clear()
     logger.setLevel(level)
-    formatter = logging.Formatter('|%(levelname)s| %(name)s - %(asctime)s - %(message)s')
+    formatter = logging.Formatter('%(levelname)7s (%(name)s) %(asctime)s - %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
     console = logging.StreamHandler()
     console.setLevel(level)
     console.setFormatter(formatter)
