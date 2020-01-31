@@ -49,7 +49,7 @@ if __name__ == "__main__":
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (160, )
+    bin_sizes = (1, )
     thresholds = (.01, )
     plot_distributions = True
 

@@ -17,11 +17,11 @@ if __name__ == '__main__':
     save_name = f"X{save_idx}.npy"
     freqs_name = f"freqs{save_idx}.npy"
 
-    dtrain = {"nsig": 10, "fvs": (5., 10., 30., 80., 110.), "amp_range": (1, 5),
+    dtrain = {"nsig": 10, "fvs": (5., 10., 30., 80., 110.), "amp_range": (4, 5),
               "shift_range": (-1, 1), "path": "../data/generated/train/"}
-    dtest = {"nsig": 20, "fvs": (5., 10., 30., 80., 110.), "amp_range": (1, 5),
+    dtest = {"nsig": 20, "fvs": (5., 10., 30., 80., 110.), "amp_range": (4, 5),
              "shift_range": (-1, 1), "path": "../data/generated/test/"}
-    dtest_br = {"nsig": 20, "fvs": (8., 7., 33., 77., 113.), "amp_range": (1, 5),
+    dtest_br = {"nsig": 20, "fvs": (8., 7., 33., 77., 113.), "amp_range": (4, 5),
                 "shift_range": (-1, 1), "path": "../data/generated/test/"}
     dnoise = {"fvs": np.arange(fs//2), "amp_range": (0, 3), "shift_range": (0, 0)}
 
@@ -48,8 +48,8 @@ if __name__ == '__main__':
     LOGGER.debug(f"psd_train.shape: {psd_train.shape}, psd_test.shape: {psd_test.shape}")
 
     LOGGER.info("Reshaping to M2 compatible shape.")
-    psd_train = np.expand_dims(psd_train, axis=0)
-    psd_test = np.expand_dims(psd_test, axis=0)
+    psd_train = np.expand_dims(psd_train.T, axis=-1)
+    psd_test = np.expand_dims(psd_test.T, axis=-1)
     LOGGER.debug(f"psd_train.shape: {psd_train.shape}, psd_test.shape: {psd_test.shape}")
 
     LOGGER.debug("Making folder if it doesn't exist")

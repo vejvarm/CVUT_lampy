@@ -11,7 +11,7 @@ from flags import FLAGS
 from dev.helpers import console_logger
 from preprocessing import Preprocessor
 
-LOGGER = console_logger(__name__, "DEBUG")
+LOGGER = console_logger(__name__, "WARNING")
 
 class Method:
 
@@ -288,6 +288,7 @@ class M2(Method):
         """
 
         freqs, PSD, PSD_var = self._get_PSD(path, period)
+        LOGGER.debug(f"PSD.shape: {PSD.shape}")
 
         multiscale_distributions = list()
 
@@ -346,6 +347,7 @@ class M2(Method):
             area = slice(i*bin_size, (i + 1)*bin_size)
             freq_bins[i, :] = freqs[area]
             psd_bins[:, i, :] = psd_array[:, area]
+        LOGGER.debug(f"psd_bins.shape: {psd_bins.shape}")
 
         return freq_bins, psd_bins
 

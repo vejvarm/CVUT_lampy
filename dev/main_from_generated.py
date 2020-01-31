@@ -53,9 +53,9 @@ if __name__ == "__main__":
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (10, 20, 40, 80,)
-    thresholds = (0.1, 1., 10.)
-    plot_distributions = False
+    bin_sizes = (40, 80, )
+    thresholds = (0.1, 0.8, )
+    plot_distributions = True
 
     # periodic params
     period = 1
@@ -107,5 +107,22 @@ if __name__ == "__main__":
     plt.grid()
 
     # save the resulting plot
-    plt.savefig(f"./images/M2/cummul_ce_nd-{ndays}_p-{period}.pdf")
+    plt.savefig(f"../images/M2/cummul_ce_nd-{ndays}_p-{period}.pdf")
+
+    # if plot distributions:
+    if plot_distributions:
+        for j, dist in enumerate((m2.trained_distributions, )):
+            for params, freqs, d in dist:
+                nrows = 1
+                ncols = 1
+                fig, axes = plt.subplots(nrows, ncols)
+                if nrows+ncols == 2:
+                    axes = np.array([axes])
+                for i, ax in enumerate(axes.flatten()):
+                    y_pos = np.arange(len(d[i, :]))
+                    ax.bar(y_pos, d[i, :], align="center", width=0.9)
+                    ax.set_xlabel("košík (bin)")
+                    ax.set_ylabel("Softmax(psd_binarized) (1)")
+                    ax.set_yscale("log")
+                fig.suptitle(f"Binarizované spektrum | bs: {params[0]} | th: {params[1]} |")
     plt.show()
