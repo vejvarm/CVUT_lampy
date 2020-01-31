@@ -8,24 +8,27 @@ from matplotlib import pyplot as plt
 from scipy import signal
 
 from flags import FLAGS
+from dev.helpers import console_logger
 from preprocessing import Preprocessor
 
+LOGGER = console_logger(__name__, "DEBUG")
 
 class Method:
 
-    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True):
+    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, nmeas=144):
         """
         :param preprocessor: (obj) Preprocessor class instance which determines how to preprocess PSD files
         :param from_existing_file: (bool) whether to try to load from existing files or ignore them
+        :param nmeas: (int) number of measurements in one day
         """
         self.preprocessor = preprocessor
         self.from_existing_file = from_existing_file
+        self.nmeas = nmeas
 
-    @staticmethod
-    def _calc_mean_and_var(psd, period=None, nmeas=144):
+    def _calc_mean_and_var(self, psd, period=None):
         naccs, nfft, ndm = psd.shape
         if period:
-            nsamples = ndm//nmeas//period
+            nsamples = ndm//self.nmeas//period
         else:
             nsamples = 1
 
@@ -46,6 +49,7 @@ class Method:
 
         :param path: (string) path to files with data
         :param period: (int) number of days from which to aggregate
+        :param remove_0th_dim: (bool) if true, removes first dimension from resulting PSD arrays
 
         :return (freqs(1Darray), mean(1Darray), var(1Darray)):
         """
@@ -83,7 +87,7 @@ class Method:
             psd = psd.reshape((naccs, nfft, ndays*nmeas))
 
             # calculate PSD (== long term average values of psd)
-            mean, var = self._calc_mean_and_var(psd, period=None, nmeas=nmeas)
+            mean, var = self._calc_mean_and_var(psd, period=None)
 
             # save freqs and PSD files
             if ".mat" not in path:
@@ -101,7 +105,7 @@ class Method:
 class M1(Method):
 
     def __init__(self, preprocessor=Preprocessor(), delta_f=5, peak_distance=10, n_peaks=10,
-                 from_existing_file=True, var_scaled_PSD=False):
+                 from_existing_file=True, nmeas=144, var_scaled_PSD=False):
         """
 
         :param preprocessor: (obj) Preprocessor class instance which determines how to preprocess PSD files
@@ -110,7 +114,7 @@ class M1(Method):
         :param n_peaks: (int) Number of peaks to pick as the top peaks
         :param var_scaled_PSD: (bool) scale the PSD by the variance of psd (PSD*PSDvar)?
         """
-        super(M1, self).__init__(preprocessor, from_existing_file=from_existing_file)
+        super(M1, self).__init__(preprocessor, from_existing_file=from_existing_file, nmeas=nmeas)
 
         self.preprocessor = preprocessor
         self.ns_per_hz = preprocessor.ns_per_hz
@@ -213,8 +217,8 @@ class M1(Method):
 
 class M2(Method):
 
-    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, var_scaled_PSD=False):
-        super(M2, self).__init__(preprocessor, from_existing_file=from_existing_file)
+    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, nmeas=144, var_scaled_PSD=False):
+        super(M2, self).__init__(preprocessor, from_existing_file=from_existing_file, nmeas=nmeas)
 
         self.bin_sizes = None
         self.thresholds = None
@@ -235,6 +239,7 @@ class M2(Method):
         self.thresholds = thresholds
 
         self.trained_distributions = self.get_multiscale_distributions(path, self.bin_sizes, self.thresholds)
+        LOGGER.debug(f"trained_distributions.shape: {[td[2].shape for td in self.trained_distributions]}")
 
         print("Training complete!")
 
@@ -248,7 +253,6 @@ class M2(Method):
         :param print_results: (int)
         :return ce: array of cross entropies for each threshold, bin_size and period
         """
-
 
         if not self.trained_distributions:
             raise(ValueError, "Nejdříve je třeba metodu natrénovat (M2().train).")
