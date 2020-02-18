@@ -66,6 +66,3 @@ if __name__ == '__main__':
     np.save(os.path.join(dtest["path"], save_name), psd_test)
     LOGGER.debug(f"psd_test saved to {dtest['path']} with file name {save_name}")
 
-    # TODO: train M2 on psd_train
-    # TODO: compare trained binarized spectra with testing binarized spectra
-
