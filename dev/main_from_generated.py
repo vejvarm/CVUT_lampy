@@ -104,35 +104,35 @@ if __name__ == "__main__":
                 a2, b2 = linear_regression(y2, x2)
                 a23, b23 = linear_regression(y23, x23)
 
-                # plot the results of cummulative cross-entropies and their regression
-                fig = plt.figure()
-                plt.plot(x23, a2*x23 + b2, "b", label=f"regrese bez porušených dat (a={a2:.1f}, b={b2:.1f})")
-                plt.plot(x23, a23*x23 + b23, "r", label=f"regrese s porušenými daty (a={a23:.1f}, b={b23:.1f})")
-                plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label="neporušená lampa")
-                plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label="porušená lampa")
-                plt.xlabel(f"perioda ({period} " + ("den" if period == 1 else "dnů") + ")")
-                plt.ylabel("kumulativní křížová entropie")
-                plt.title("Porovnání kumulativních křížových entropií")
-                plt.legend()
-                plt.grid()
+    # plot the results of cummulative cross-entropies and their regression
+    plt.plot(x23, a2*x23 + b2, "b", label=f"regression of signals with unshifted frequencies (a={a2:.1f}, b={b2:.1f})")
+    plt.plot(x23, a23*x23 + b23, "r", label=f"regression including signals with shifted frequencies (a={a23:.1f}, b={b23:.1f})")
+    plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of freq. unshifted signals")
+    plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of freq. shifted signals")
+    plt.xlabel(f"period ({period} " + ("signal" if period == 1 else "signals") + ")")
+    plt.ylabel("MCCE")
+    plt.title("Multiscale Cummulative Cross-Entropy with regression")
+    plt.legend()
+    plt.grid()
 
                 # save the resulting plot
                 plt.savefig(f"../images/M2/cce_nd-{ndays}_p-{period}_i_{idx}_sAmp{s_amp}_nAmp{n_amp}.pdf")
 
-                # if plot distributions:
-                if plot_distributions:
-                    for j, dist in enumerate((m2.trained_distributions, )):
-                        for params, freqs, d in dist:
-                            nrows = 1
-                            ncols = 1
-                            fig, axes = plt.subplots(nrows, ncols)
-                            if nrows+ncols == 2:
-                                axes = np.array([axes])
-                            for i, ax in enumerate(axes.flatten()):
-                                y_pos = np.arange(len(d[i, :]))
-                                ax.bar(y_pos, d[i, :], align="center", width=0.9)
-                                ax.set_xlabel("košík (bin)")
-                                ax.set_ylabel("Softmax(psd_binarized) (1)")
-                                ax.set_yscale("log")
-                            fig.suptitle(f"Binarizované spektrum | bs: {params[0]} | th: {params[1]} |")
-                plt.show()
+    # if plot distributions:
+    if plot_distributions:
+        for j, dist in enumerate((m2.trained_distributions, )):
+            for params, freqs, d in dist:
+                nrows = 1
+                ncols = 1
+                fig, axes = plt.subplots(nrows, ncols)
+                if nrows+ncols == 2:
+                    axes = np.array([axes])
+                for i, ax in enumerate(axes.flatten()):
+                    y_pos = np.arange(len(d[i, :]))
+                    ax.bar(y_pos, d[i, :], align="center", width=0.9)
+                    ax.set_xlabel("bin number")
+                    ax.set_ylabel("Softmax(psd_binarized) (1)")
+                    ax.set_yscale("log")
+                fig.suptitle(f"Binarized spectrum | bin size: {params[0]} | threshold: {params[1]} |")
+                plt.savefig(f"../images/M2/binarized-spectra/binarized_spectrum_bs-{params[0]}_th-{params[1]}.png", dpi=200)
+    plt.show()
