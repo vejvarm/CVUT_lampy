@@ -44,13 +44,13 @@ if __name__ == "__main__":
     folder = FLAGS.paths[setting]["folder"]
     dataset = FLAGS.paths[setting]["dataset"]
     period = [FLAGS.paths[setting]["period"]]*len(dataset)
-    filename = ["X.npy"]*len(dataset)
+    filename = ["X_l1.npy"]*len(dataset)
     paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
     from_existing_file = True
 
     # multiscale params
     bin_sizes = (1, )
-    thresholds = (.01, )
+    thresholds = (0.1, 0.8, )
     plot_distributions = True
 
     # periodic params
