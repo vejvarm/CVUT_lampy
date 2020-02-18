@@ -43,13 +43,14 @@ def linear_regression(y, x=None):
     a, b = np.linalg.lstsq(A, y, rcond=None)[0]
     return a, b
 
+# TODO: vypočítat relativní odchylku mezi směrnicemi unshifted a shifted dat
 
 if __name__ == "__main__":
     # DATA LOADING SETTINGS
     nrepeats = 1
-    signal_amps = [(4, 5)]
-    noise_amps = [(0, 1), (0, 2), (0, 3), (0, 5), (1, 2), (2, 3), (3, 4), (4, 5),
-                  (5, 6), (6, 7), (7, 8), (8, 9), (9, 10), (10, 11)]
+    signal_amps = [(0, 1)]
+    noise_amps = [(0, 0), (0, 0.25), (0, 0.5), (0, 0.75), (0, 1), (0, 1.5), (0, 2), (0, 4)]
+    root = "../data/generated"
 
     # PARAMS
     from_existing_file = True
@@ -71,7 +72,6 @@ if __name__ == "__main__":
     for idx in range(nrepeats):
         for s_amp in signal_amps:
             for n_amp in noise_amps:
-                root = "../data/generated"
                 path_train = {"folder": f"{root}/train", "name": f"X{idx}_sAmp{s_amp}_nAmp{n_amp}.npy"}
                 path_test = {"folder": f"{root}/test", "name": f"X{idx}_sAmp{s_amp}_nAmp{n_amp}.npy"}
 
@@ -102,17 +102,19 @@ if __name__ == "__main__":
 
                 # Calculate params for linear regressions
                 a2, b2 = linear_regression(y2, x2)
-                a23, b23 = linear_regression(y23, x23)
+                a3, b3 = linear_regression(y3, x3)
+                rel_diff = (a3 - a2)/a2*100
 
                 # plot the results of cummulative cross-entropies and their regression
                 fig = plt.figure()
-                plt.plot(x23, a2*x23 + b2, "b", label=f"regress. unshifted frequencies (a={a2:.1f}, b={b2:.1f})")
-                plt.plot(x23, a23*x23 + b23, "r", label=f"regress. shifted frequencies (a={a23:.1f}, b={b23:.1f})")
+                plt.plot(x23, a2*x23 + b2, "b", label=f"regress. unshifted frequencies (α={a2:.1f})")
+                plt.plot(x23, a3*x23 + b3, "r", label=f"regress. shifted frequencies (α={a3:.1f})")
                 plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of freq. unshifted signals")
                 plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of freq. shifted signals")
+                plt.ylim([0, None])
                 plt.xlabel(f"period ({period} " + ("signal" if period == 1 else "signals") + ")")
                 plt.ylabel("MCCE")
-                plt.title(f"MCCE with regression (sAmp: {s_amp}, nAmp: {n_amp})")
+                plt.title(f"MCCE with regression (dα = {rel_diff:.2f} %) \nsignal: {s_amp}, noise: {n_amp}")
                 plt.legend()
                 plt.grid()
 

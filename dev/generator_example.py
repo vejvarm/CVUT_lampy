@@ -50,8 +50,8 @@ if __name__ == "__main__":
     plotter(t, xn.T, ax[2], title="signal + noise", xlabel="time (s)")
 
     # FFT zašumělých signálů
-    fs = np.arange(nfft//2)/nfft*fs
-    plotter(fs, X.T, title="Fourier spectra of noisy signals", xlabel="Frequency (Hz)", ylabel="abs(fft)")
+    fss = np.arange(nfft//2)/nfft*fs
+    plotter(fss, X.T, title="Fourier spectra of noisy signals", xlabel="Frequency (Hz)", ylabel="abs(fft)")
 
     # Preprocessing zašumělých signálů a jejich průměr
     plotter(freq_vals, psd.mean(axis=-1), title="Mean preprocessed spectrum", xlabel="Frequency (Hz)", ylabel="psd")
