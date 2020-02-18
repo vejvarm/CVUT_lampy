@@ -12,7 +12,7 @@ def plotter(x, y, ax=None, title="", xlabel="", ylabel="", label=""):
     ax.set_ylabel(ylabel)
 
 
-def console_logger(name="__main__", level=logging.WARNING):
+def console_logger(name=__name__, level=logging.WARNING):
 
     if not isinstance(level, (str, int)):
         raise TypeError("Logging level data type is not recognised. Should be str or int.")
