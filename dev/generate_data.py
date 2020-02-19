@@ -1,18 +1,46 @@
 import os
 
 import numpy as np
+import pandas as pd
 
 from matplotlib import pyplot as plt
 
+from flags import FLAGS
 from dev.helpers import console_logger, plotter
 from dev.Generator import Generator
-from Methods import M2
 from preprocessing import Preprocessor
 
 LOGGER = console_logger(__name__, "DEBUG")
+PSNR_CSV_SETUP = FLAGS.PSNR_csv_setup
+
+
+def generate_and_compute_snr(signal_gen, noise_gen, shape=(10, 15360)):
+    assert len(shape) == 2, "given shape must be shape 2 Tuple or List"
+    signal = signal_gen.generate(*shape)
+    noise = noise_gen.generate(*shape)
+
+#    s_power = np.sum(abs(signal)**2)/np.size(signal)
+#    n_power = np.sum(abs(noise)**2)/np.size(noise)  # == MSE
+#    LOGGER.debug(f"s_power: {s_power:.2f} | n_power: {n_power:.2f}")
+
+#    s_max = np.max(signal)**2
+#    n_max = np.max(noise)**2
+#    LOGGER.debug(f"s_max: {s_max:.2f} | n_max: {n_max:.2f}")
+
+#    SNR = s_power/n_power
+#    PSNR = s_max/n_power
+#    LOGGER.debug(f"SNR: {SNR:.3f} | PSNR: {PSNR:.3f}")
+
+    SS = np.abs(np.fft.fft(signal))**2
+    NN = np.abs(np.fft.fft(noise))**2
+    PSNR_dB = 10*np.log(np.max(SS)/np.mean(NN))  # dB Signal to noise ratio
+
+    LOGGER.debug(f"PSNR_dB: {PSNR_dB:.3f} dB")
+    return signal + noise, PSNR_dB
+
 
 if __name__ == '__main__':
-    nrepeats = 1
+    nrepeats = 10
     signal_amps = [(0, 1)]
     noise_amps = [(0, 0), (0, 0.25), (0, 0.5), (0, 0.75), (0, 1), (0, 1.5), (0, 2), (0, 4)]
 
@@ -20,6 +48,8 @@ if __name__ == '__main__':
     nfft = 5120
     nsamples = 15360
     root = "../data/generated"
+
+    dPSNR = {"episode": [], "signal_amp_max": [], "noise_amp_max": [], "train_PSNR (dB)": [], "test_PSNR (dB)": []}
 
     for i in range(nrepeats):
         for s_amp in signal_amps:
@@ -40,9 +70,9 @@ if __name__ == '__main__':
 
                 LOGGER.info("Generating signal values with added noise.")
                 t = np.arange(nsamples)/fs
-                x_train = g_train.generate(dtrain["nsig"], nsamples) + g_noise.generate(dtrain["nsig"], nsamples)
-                x_test = g_test.generate(dtest["nsig"], nsamples) + g_noise.generate(dtest["nsig"], nsamples)
-                x_test_br = g_test_br.generate(dtest_br["nsig"], nsamples) + g_noise.generate(dtest_br["nsig"], nsamples)
+                x_train, PSNR_train = generate_and_compute_snr(g_train, g_noise, shape=(dtrain["nsig"], nsamples))
+                x_test, PSNR_test = generate_and_compute_snr(g_test, g_noise, shape=(dtest["nsig"], nsamples))
+                x_test_br, PSNR_test_br = generate_and_compute_snr(g_test_br, g_noise, shape=(dtest_br["nsig"], nsamples))
                 LOGGER.debug(f"x_train.shape: {x_train.shape}, x_test.shape: {x_test.shape}, x_test_br.shape: {x_test_br.shape}")
 
                 LOGGER.info("Concatenating unbroken and broken test data")
@@ -113,4 +143,18 @@ if __name__ == '__main__':
                 LOGGER.info("Saving mean preprocessed spectral densities of noisy signals plot.")
                 save_name = f"PSD{i}_sAmp{s_amp}_nAmp{n_amp}.pdf"
                 plt.savefig(os.path.join(root, save_name))
+
+                # Uložení PSNR do slovníku
+                # {"i": [], "signal_amp": [], "noise_amp": [], "train_PSNR (dB)": [], "test_PSNR (dB)": []}
+                LOGGER.info("Saving PSNR values to dictionary")
+                dPSNR["episode"].append(i)
+                dPSNR["signal_amp_max"].append(s_amp[1])
+                dPSNR["noise_amp_max"].append(n_amp[1])
+                dPSNR["train_PSNR (dB)"].append(PSNR_train)
+                dPSNR["test_PSNR (dB)"].append(np.mean([PSNR_test, PSNR_test_br]))
+                LOGGER.debug(f"dPSNR.values: {list(dPSNR.values())}")
+    dfPSNR = pd.DataFrame(dPSNR, columns=list(dPSNR.keys()))
+    with open(os.path.join(root, PSNR_CSV_SETUP["name"]), "w") as f:
+        dfPSNR.to_csv(f, sep=PSNR_CSV_SETUP["sep"], decimal=PSNR_CSV_SETUP["decimal"], index=PSNR_CSV_SETUP["index"],
+                      columns=PSNR_CSV_SETUP["columns"], line_terminator=PSNR_CSV_SETUP["line_terminator"])
     plt.show()

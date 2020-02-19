@@ -31,3 +31,13 @@ class FLAGS:
         "use_autocorr": True,
         "rem_neg": True
     }
+
+    PSNR_csv_setup = {
+        "name": "PSNR.csv",
+        "name2": "PSNRda.csv",
+        "columns": ["episode", "signal_amp_max", "noise_amp_max", "train_PSNR (dB)", "test_PSNR (dB)"],
+        "sep": ";",
+        "decimal": ",",
+        "index": False,
+        "line_terminator": "\n"
+    }

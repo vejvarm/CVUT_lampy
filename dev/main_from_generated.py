@@ -2,6 +2,7 @@ import os
 from collections import Counter
 
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 
 from flags import FLAGS
@@ -12,7 +13,13 @@ from Methods import M2
 # TODO: korelace mezi sílou větru, rychlostí větru a amplitudou (vybuzeností) vlastních frekvencí
 
 LOGGER = console_logger(__name__, "DEBUG")
+PSNR_CSV_SETUP = FLAGS.PSNR_csv_setup
 
+_EPISODE = PSNR_CSV_SETUP["columns"][0]
+_SIGNAL_AMP = PSNR_CSV_SETUP["columns"][1]
+_NOISE_AMP = PSNR_CSV_SETUP["columns"][2]
+_TRAIN_PSNR = PSNR_CSV_SETUP["columns"][-2]
+_TEST_PSNR = PSNR_CSV_SETUP["columns"][-1]
 
 def calc_periodic_best(ce, bin_sizes, thresholds):
     nperiods, nparams = ce.shape
@@ -43,11 +50,9 @@ def linear_regression(y, x=None):
     a, b = np.linalg.lstsq(A, y, rcond=None)[0]
     return a, b
 
-# TODO: vypočítat relativní odchylku mezi směrnicemi unshifted a shifted dat
-
 if __name__ == "__main__":
     # DATA LOADING SETTINGS
-    nrepeats = 1
+    nrepeats = 10
     signal_amps = [(0, 1)]
     noise_amps = [(0, 0), (0, 0.25), (0, 0.5), (0, 0.75), (0, 1), (0, 1.5), (0, 2), (0, 4)]
     root = "../data/generated"
@@ -56,8 +61,8 @@ if __name__ == "__main__":
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (40, 80,)
-    thresholds = (0.1, 0.8,)
+    bin_sizes = (5, 10, 20)
+    thresholds = (0.1, 0.5, 0.8)
     plot_distributions = False
 
     # periodic params
@@ -67,6 +72,14 @@ if __name__ == "__main__":
 
     ndays_unbroken = 20
     ndays_broken = 20
+
+    # relative difference container
+    rel_diff_list = []
+
+    # PSNR
+    with open(os.path.join(root, PSNR_CSV_SETUP["name"]), "r") as f:
+        dfPSNR = pd.read_csv(f, sep=PSNR_CSV_SETUP["sep"], decimal=PSNR_CSV_SETUP["decimal"],
+                             index_col=PSNR_CSV_SETUP["index"], lineterminator=PSNR_CSV_SETUP["line_terminator"])
 
     # Paths to files
     for idx in range(nrepeats):
@@ -104,8 +117,17 @@ if __name__ == "__main__":
                 a2, b2 = linear_regression(y2, x2)
                 a3, b3 = linear_regression(y3, x3)
                 rel_diff = (a3 - a2)/a2*100
+                rel_diff_list.append(rel_diff)
+
+                # get row from PSNR dataframe for current data
+                row = dfPSNR.loc[(dfPSNR[_EPISODE] == idx) &
+                                 (dfPSNR[_SIGNAL_AMP] == s_amp[1]) &
+                                 (dfPSNR[_NOISE_AMP] == n_amp[1])]
+                psnr = (float(row[_TRAIN_PSNR]) + float(row[_TEST_PSNR]))/2
+                LOGGER.debug(f"PSNR value: {psnr}")
 
                 # plot the results of cummulative cross-entropies and their regression
+                LOGGER.info("Plotting resulting MCCE")
                 fig = plt.figure()
                 plt.plot(x23, a2*x23 + b2, "b", label=f"regress. unshifted frequencies (α={a2:.1f})")
                 plt.plot(x23, a3*x23 + b3, "r", label=f"regress. shifted frequencies (α={a3:.1f})")
@@ -114,15 +136,17 @@ if __name__ == "__main__":
                 plt.ylim([0, None])
                 plt.xlabel(f"period ({period} " + ("signal" if period == 1 else "signals") + ")")
                 plt.ylabel("MCCE")
-                plt.title(f"MCCE with regression (dα = {rel_diff:.2f} %) \nsignal: {s_amp}, noise: {n_amp}")
+                plt.title(f"MCCE with regression \n (PSNR: {psnr:.2f} dB | dα: {rel_diff:.2f} %)")
                 plt.legend()
                 plt.grid()
 
                 # save the resulting plot
+                LOGGER.info("Saving current plot")
                 plt.savefig(f"../images/M2/cce_nd-{ndays}_p-{period}_i_{idx}_sAmp{s_amp}_nAmp{n_amp}.pdf")
 
                 # if plot distributions:
                 if plot_distributions:
+                    LOGGER.info("Plotting binarized distributions")
                     for j, dist in enumerate((m2.trained_distributions, )):
                         for params, freqs, d in dist:
                             nrows = 1
@@ -138,4 +162,10 @@ if __name__ == "__main__":
                                 ax.set_yscale("log")
                             fig.suptitle(f"Binarized spectrum | bin size: {params[0]} | threshold: {params[1]} |")
                             plt.savefig(f"../images/M2/binarized-spectra/binarized_spectrum_bs-{params[0]}_th-{params[1]}.png", dpi=200)
+    LOGGER.info(f"Adding dα column to dfPSNR")
+    dfPSNR["da (%)"] = pd.Series(rel_diff_list, index=dfPSNR.index)
+    LOGGER.info(f"Saving updated dfPSNR")
+    with open(os.path.join(root, PSNR_CSV_SETUP["name2"]), "w") as f:
+        dfPSNR.to_csv(f, sep=PSNR_CSV_SETUP["sep"], decimal=PSNR_CSV_SETUP["decimal"], index=PSNR_CSV_SETUP["index"],
+                      line_terminator=PSNR_CSV_SETUP["line_terminator"])
     plt.show()
