@@ -40,7 +40,7 @@ def generate_and_compute_snr(signal_gen, noise_gen, shape=(10, 15360)):
 
 
 if __name__ == '__main__':
-    nrepeats = 10
+    nrepeats = 1
     signal_amps = [(0, 1)]
     noise_amps = [(0, 0), (0, 0.25), (0, 0.5), (0, 0.75), (0, 1), (0, 1.5), (0, 2), (0, 4)]
 
@@ -60,7 +60,7 @@ if __name__ == '__main__':
                          "shift_range": (0, 0), "path": f"{root}/test/"}
                 dtest_br = {"nsig": 20, "fvs": (8., 7., 33., 77., 113.), "amp_range": s_amp,
                             "shift_range": (0, 0), "path": f"{root}/test/"}
-                dnoise = {"fvs": np.arange(fs//2), "amp_range": n_amp, "shift_range": (0, 0)}
+                dnoise = {"fvs": np.arange(fs), "amp_range": n_amp, "shift_range": (0, 0)}
 
                 LOGGER.info("Initialising signal and noise generators.")
                 g_train = Generator(fs, fvs=dtrain["fvs"], amp_range=dtrain["amp_range"], shift_range=dtrain["shift_range"])
@@ -93,18 +93,26 @@ if __name__ == '__main__':
                 os.makedirs(dtrain["path"], exist_ok=True)
                 os.makedirs(dtest["path"], exist_ok=True)
 
-                LOGGER.info("Generating save file name.")
-                save_name = f"X{i}_sAmp{s_amp}_nAmp{n_amp}.npy"
+                LOGGER.info("Generating save file names.")
+                save_name_raw = f"raw{i}_sAmp{s_amp}_nAmp{n_amp}.npy"
+                save_name_psd = f"X{i}_sAmp{s_amp}_nAmp{n_amp}.npy"
                 freqs_name = f"freqs{i}.npy"
+
+                LOGGER.info("Saving raw signals to files.")
+                np.save(os.path.join(dtrain["path"], save_name_raw), x_train)
+                LOGGER.debug(f"x_train saved to {dtrain['path']} with file name {save_name_raw}")
+                np.save(os.path.join(dtest["path"], save_name_raw), x_test)
+                LOGGER.debug(f"x_test saved to {dtest['path']} with file name {save_name_raw}")
+
                 LOGGER.info("Saving generated arrays to files.")
                 np.save(os.path.join(dtrain["path"], "freqs.npy"), freq_train)
                 LOGGER.debug(f"freq_train saved to {dtrain['path']} with file name {freqs_name}")
-                np.save(os.path.join(dtrain["path"], save_name), psd_train)
-                LOGGER.debug(f"psd_train saved to {dtrain['path']} with file name {save_name}")
+                np.save(os.path.join(dtrain["path"], save_name_psd), psd_train)
+                LOGGER.debug(f"psd_train saved to {dtrain['path']} with file name {save_name_psd}")
                 np.save(os.path.join(dtest["path"], "freqs.npy"), freq_test)
                 LOGGER.debug(f"freq_test saved to {dtest['path']} with file name {freqs_name}")
-                np.save(os.path.join(dtest["path"], save_name), psd_test)
-                LOGGER.debug(f"psd_test saved to {dtest['path']} with file name {save_name}")
+                np.save(os.path.join(dtest["path"], save_name_psd), psd_test)
+                LOGGER.debug(f"psd_test saved to {dtest['path']} with file name {save_name_psd}")
 
                 # Vykreslení výsledků
                 LOGGER.info("Plotting results.")

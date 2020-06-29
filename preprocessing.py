@@ -11,6 +11,10 @@ from scipy.linalg import hankel
 from tqdm import tqdm
 
 from flags import FLAGS
+from dev.helpers import console_logger
+
+LOGGER = console_logger(__name__, "WARNING")
+
 
 def _remove_negative(psd_arr):
     """
@@ -145,16 +149,32 @@ class Preprocessor:
         :return: preprocessed psd
         """
 
+        LOGGER.info(f"_calc_zscore")
         arr = self._calc_zscore(arr)
+        LOGGER.debug(f"arr[0]: {arr[0]}")
+        LOGGER.info(f"_apply_time_domain_filters")
         arr = self._apply_time_domain_filters(arr)
+        LOGGER.debug(f"arr[0]: {arr[0]}")
         if self.use_autocorr:
+            LOGGER.info(f"_autocorr")
             arr = self._autocorr(arr)
+            LOGGER.debug(f"arr[0]: {arr[0]}")
+        LOGGER.info(f"_calc_psd")
         freq_vals, psd = self._calc_psd(arr)
+        LOGGER.debug(f"psd[0]: {psd[0]}")
+        LOGGER.info(f"_psd_z_score")
         psd = (psd - psd.mean()) / psd.std()
+        LOGGER.debug(f"psd[0]: {psd[0]}")
+        LOGGER.info(f"_coarse_grain")
         psd = self._coarse_grain(psd)
+        LOGGER.debug(f"psd[0]: {psd[0]}")
+        LOGGER.info(f"_detrend")
         psd = self._detrend(freq_vals, psd)
+        LOGGER.debug(f"psd[0]: {psd[0]}")
         if self.rem_neg:
+            LOGGER.info(f"_remove_negative")
             psd = self._remove_negative(psd)
+            LOGGER.debug(f"psd[0]: {psd[0]}")
 
         return freq_vals, psd
 
