@@ -4,11 +4,8 @@ import os
 import numpy as np
 import scipy.io
 
-from matplotlib import pyplot as plt
-
-from dev.helpers import console_logger
-from preprocessing import Preprocessor
-from Methods import M2
+from bin.helpers import console_logger
+from bin.Preprocessor import Preprocessor
 
 LOGGER = console_logger(__name__, "DEBUG")
 

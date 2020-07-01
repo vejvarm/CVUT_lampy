@@ -2,14 +2,11 @@
 # plotting
 import os
 
-import numpy as np
-
 from matplotlib import pyplot as plt
 
-from preprocessing import Preprocessor
-from Aggregators import Average, complete_average
-from flags import FLAGS
-from Methods import M2
+from bin.Preprocessor import Preprocessor
+from bin.flags import FLAGS
+from bin.Methods import M2
 
 if __name__ == '__main__':
     setting = "training"

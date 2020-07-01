@@ -5,7 +5,7 @@ from sklearn.preprocessing import StandardScaler
 
 from matplotlib import pyplot as plt
 
-from preprocessing import Preprocessor
+from bin.Preprocessor import Preprocessor
 
 
 def load_and_standardize(path_list):

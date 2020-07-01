@@ -1,9 +1,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from dev.helpers import plotter
-from dev.Generator import Generator
-from preprocessing import Preprocessor
+from bin.helpers import plotter
+from bin.Generator import Generator
+from bin.Preprocessor import Preprocessor
 
 if __name__ == "__main__":
     savefigs = True

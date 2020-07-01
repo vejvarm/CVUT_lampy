@@ -5,15 +5,15 @@ import tensorflow as tf
 
 from datetime import datetime
 
-from tensorflow.keras import Model, Sequential
-from tensorflow.keras.layers import InputLayer, Layer, Conv1D, Dense, Softmax, Flatten, Dropout, BatchNormalization
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import InputLayer, Conv1D, Dense, Flatten, Dropout
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, TensorBoard, ModelCheckpoint, ReduceLROnPlateau
 
 from scipy.io import loadmat
 
-from flags import FLAGS
+from bin.flags import FLAGS
 
 # global settings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

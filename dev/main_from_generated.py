@@ -5,10 +5,10 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from flags import FLAGS
-from dev.helpers import console_logger
-from preprocessing import Preprocessor
-from Methods import M2
+from bin.flags import FLAGS
+from bin.helpers import console_logger
+from bin.Preprocessor import Preprocessor
+from bin.Methods import M2
 
 # TODO: korelace mezi sílou větru, rychlostí větru a amplitudou (vybuzeností) vlastních frekvencí
 
@@ -49,6 +49,7 @@ def linear_regression(y, x=None):
     A = np.vstack((x, np.ones(ndata))).T
     a, b = np.linalg.lstsq(A, y, rcond=None)[0]
     return a, b
+
 
 if __name__ == "__main__":
     # DATA LOADING SETTINGS

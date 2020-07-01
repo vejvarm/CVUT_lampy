@@ -1,8 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-from dev.helpers import console_logger
+from bin.helpers import console_logger
 
 LOGGER = console_logger(__name__, level="DEBUG")
 

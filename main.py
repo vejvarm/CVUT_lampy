@@ -1,8 +1,8 @@
 from collections import Counter
 
-from flags import FLAGS
-from preprocessing import Preprocessor
-from Methods import M2
+from bin.flags import FLAGS
+from bin.Preprocessor import Preprocessor
+from bin.Methods import M2
 
 import numpy as np
 from matplotlib import pyplot as plt

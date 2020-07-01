@@ -1,9 +1,7 @@
-import numpy as np
-
 from matplotlib import pyplot as plt
 
-from preprocessing import Preprocessor
-from Aggregators import Average, complete_average
+from bin.Preprocessor import Preprocessor
+from bin.Aggregators import Average, complete_average
 
 
 if __name__ == '__main__':

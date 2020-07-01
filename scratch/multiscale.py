@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from preprocessing import Preprocessor
+from bin.Preprocessor import Preprocessor
 
 
 def binarize(psd_array, threshhold):

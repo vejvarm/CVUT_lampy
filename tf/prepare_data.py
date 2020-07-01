@@ -1,8 +1,8 @@
-from preprocessing import Preprocessor
+from bin.Preprocessor import Preprocessor
 
 import numpy as np
 
-from flags import FLAGS
+from bin.flags import FLAGS
 
 if __name__ == '__main__':
 

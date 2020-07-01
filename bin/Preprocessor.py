@@ -7,11 +7,10 @@ from matplotlib import pyplot as plt
 from scipy.io import loadmat
 from scipy.signal import butter, filtfilt
 from scipy.optimize import leastsq
-from scipy.linalg import hankel
 from tqdm import tqdm
 
-from flags import FLAGS
-from dev.helpers import console_logger
+from bin.flags import FLAGS
+from bin.helpers import console_logger
 
 LOGGER = console_logger(__name__, "WARNING")
 

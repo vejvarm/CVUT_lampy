@@ -3,9 +3,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import animation as animation
 
-from preprocessing import Preprocessor
-from Methods import Method
-
 
 def _animate_init(naccs, freqs, PSD_means, fig):
     ax = list()

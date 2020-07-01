@@ -3,7 +3,7 @@ import numpy as np
 from scipy.optimize import leastsq
 from matplotlib import pyplot as plt
 
-from preprocessing import Preprocessor
+from bin.Preprocessor import Preprocessor
 
 
 def curve_linear(par, x):

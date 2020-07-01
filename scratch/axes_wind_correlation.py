@@ -1,4 +1,4 @@
-from flags import FLAGS
+from bin.flags import FLAGS
 
 import numpy as np
 from matplotlib import pyplot as plt

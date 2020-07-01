@@ -1,7 +1,7 @@
 import numpy as np
 import SimpSOM as sps
 
-from preprocessing import Preprocessor
+from bin.Preprocessor import Preprocessor
 
 if __name__ == '__main__':
     # Loading data

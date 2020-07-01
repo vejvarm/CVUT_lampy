@@ -1,10 +1,8 @@
 import numpy as np
 
 from matplotlib import pyplot as plt
-from matplotlib import animation as animation
 
-from preprocessing import Preprocessor
-from Methods import Method
+from bin.Preprocessor import Preprocessor
 
 
 def signaltonoise(a, axis=0, ddof=0):

@@ -3,7 +3,7 @@ from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import numpy as np
 
-from flags import FLAGS
+from bin.flags import FLAGS
 
 
 def load_accs(path, naccs=FLAGS.naccs):

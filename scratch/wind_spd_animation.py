@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import animation as animation
 
-from preprocessing import Preprocessor
+from bin.Preprocessor import Preprocessor
 
 # Loading data
 path_list = ['../data/neporuseno/week']

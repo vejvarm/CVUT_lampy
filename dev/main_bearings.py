@@ -2,13 +2,12 @@ import os
 from collections import Counter
 
 import numpy as np
-import pandas as pd
 from matplotlib import pyplot as plt
 
-from flags import FLAGS
-from dev.helpers import console_logger
-from preprocessing import Preprocessor
-from Methods import M2
+from bin.flags import FLAGS
+from bin.helpers import console_logger
+from bin.Preprocessor import Preprocessor
+from bin.Methods import M2
 
 LOGGER = console_logger(__name__, "DEBUG")
 PSNR_CSV_SETUP = FLAGS.PSNR_csv_setup
@@ -78,6 +77,7 @@ if __name__ == "__main__":
         raise(ValueError, "Fault choice must be one of Inner Rail ('IR'), Outer Rail ('ORat##'), or  Ball ('BL')")
 
     # PARAMS
+    save_plot = False
     from_existing_file = True
 
     # multiscale params
@@ -149,9 +149,10 @@ if __name__ == "__main__":
                 plt.grid()
 
                 # save the resulting plot
-                LOGGER.info("Saving current plot")
-                os.makedirs(f"{root}/images", exist_ok=True)
-                plt.savefig(f"{root}/images/cce_nd-{ndays}_p-{period}_i_{idx}_sAmp{s_amp}_nAmp{n_amp}.pdf")
+                if save_plot:
+                    LOGGER.info("Saving current plot")
+                    os.makedirs(f"{root}/images", exist_ok=True)
+                    plt.savefig(f"{root}/images/cce_nd-{ndays}_p-{period}_i_{idx}_sAmp{s_amp}_nAmp{n_amp}.pdf")
 
                 # if plot distributions:
                 if plot_distributions:

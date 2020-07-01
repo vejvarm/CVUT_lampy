@@ -3,13 +3,12 @@ import os
 
 import numpy as np
 
-from os import path
 from matplotlib import pyplot as plt
 from scipy import signal
 
-from flags import FLAGS
-from dev.helpers import console_logger
-from preprocessing import Preprocessor
+from bin.flags import FLAGS
+from bin.helpers import console_logger
+from bin.Preprocessor import Preprocessor
 
 LOGGER = console_logger(__name__, "WARNING")
 

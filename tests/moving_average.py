@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from Aggregators import Average
+from bin.Aggregators import Average
 
 
 class TestAggregators(unittest.TestCase):

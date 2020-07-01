@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from scipy.io import loadmat
 
 from wind.helpers import wd_str2rad
-from preprocessing import Preprocessor
+from bin.Preprocessor import Preprocessor
 
 
 def load_wind(path):
