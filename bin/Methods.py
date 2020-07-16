@@ -344,8 +344,16 @@ class M2(Method):
 
         for i in range(nbins):
             area = slice(i*bin_size, (i + 1)*bin_size)
-            freq_bins[i, :] = freqs[area]
-            psd_bins[:, i, :] = psd_array[:, area]
+            fbin = freqs[area]
+            pbin = psd_array[:, area]
+            LOGGER.debug(f"fbin.shape: {fbin.shape}")
+            if fbin.shape[0] < bin_size:
+                LOGGER.info(f"Padding last bin to match shape!")
+                fbin = np.pad(fbin, (0, bin_size - fbin.shape[0]), constant_values=np.max(fbin))
+                LOGGER.debug(f"fbin: {fbin}")
+                pbin = np.pad(pbin, ((0, 0), (0, bin_size - pbin.shape[1])), constant_values=0)
+            freq_bins[i, :] = fbin
+            psd_bins[:, i, :] = pbin
         LOGGER.debug(f"psd_bins.shape: {psd_bins.shape}")
 
         return freq_bins, psd_bins
