@@ -53,26 +53,26 @@ def linear_regression(y, x=None):
 
 if __name__ == "__main__":
     # DATA LOADING SETTINGS
-    nrepeats = 10
-    signal_amps = [(0, 1)]
-    noise_amps = [(0, 0), (0, 0.25), (0, 0.5), (0, 0.75), (0, 1), (0, 1.5), (0, 2), (0, 4)]
-    root = "../data/generated"
+    nrepeats = 1
+    signal_amps = [(0.75, 1)]
+    noise_amps = [(0, 0.5)]
+    root = "../data/for_article/generated"
 
     # PARAMS
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (5, 10, 20)
-    thresholds = (0.1, 0.5, 0.8)
+    bin_sizes = (32, 48, )
+    thresholds = (0.5, 2.5)
     plot_distributions = False
 
     # periodic params
     period = 1
-    nmeas = 1  # number of measurements in one day!
-    ndays = 40
+    nmeas = 3  # number of measurements in one day!
+    ndays = 4
 
-    ndays_unbroken = 20
-    ndays_broken = 20
+    ndays_unbroken = 2
+    ndays_broken = 2
 
     # relative difference container
     rel_diff_list = []
@@ -135,7 +135,7 @@ if __name__ == "__main__":
                 plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of freq. unshifted signals")
                 plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of freq. shifted signals")
                 plt.ylim([0, None])
-                plt.xlabel(f"period ({period} " + ("signal" if period == 1 else "signals") + ")")
+                plt.xlabel(f"days (period = {period} " + ("day" if period == 1 else "days") + ")")
                 plt.ylabel("MCCE")
                 plt.title(f"MCCE with regression \n (PSNR: {psnr:.2f} dB | dα: {rel_diff:.2f} %)")
                 plt.legend()
@@ -143,11 +143,14 @@ if __name__ == "__main__":
 
                 # save the resulting plot
                 LOGGER.info("Saving current plot")
-                plt.savefig(f"../images/M2/cce_nd-{ndays}_p-{period}_i_{idx}_sAmp{s_amp}_nAmp{n_amp}.pdf")
+                flnm = f"../images/M2/cce_nd-{ndays}_p-{period}_i_{idx}_sAmp{s_amp}_nAmp{n_amp}"
+                plt.savefig(f"{flnm}.png", dpi=200)
+                plt.savefig(f"{flnm}.pdf")
+                plt.savefig(f"{flnm}.svg")
 
                 # if plot distributions:
                 if plot_distributions:
-                    LOGGER.info("Plotting binarized distributions")
+                    LOGGER.info("Plotting trained binarized distributions")
                     for j, dist in enumerate((m2.trained_distributions, )):
                         for params, freqs, d in dist:
                             nrows = 1
@@ -162,7 +165,10 @@ if __name__ == "__main__":
                                 ax.set_ylabel("Softmax(psd_binarized) (1)")
                                 ax.set_yscale("log")
                             fig.suptitle(f"Binarized spectrum | bin size: {params[0]} | threshold: {params[1]} |")
-                            plt.savefig(f"../images/M2/binarized-spectra/binarized_spectrum_bs-{params[0]}_th-{params[1]}.png", dpi=200)
+                            flnm = f"../images/M2/binarized-spectra/binarized_spectrum_bs-{params[0]}_th-{params[1]}"
+                            plt.savefig(f"{flnm}.png", dpi=200)
+                            plt.savefig(f"{flnm}.pdf")
+                            plt.savefig(f"{flnm}.svg")
     LOGGER.info(f"Adding dα column to dfPSNR")
     dfPSNR["da (%)"] = pd.Series(rel_diff_list, index=dfPSNR.index)
     LOGGER.info(f"Saving updated dfPSNR")
