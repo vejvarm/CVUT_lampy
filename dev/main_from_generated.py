@@ -62,8 +62,8 @@ if __name__ == "__main__":
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (32, 48, )
-    thresholds = (0.5, 2.5)
+    bin_sizes = (32, 64, 128, )
+    thresholds = (0.001, 0.5, 2.5, )
     plot_distributions = False
 
     # periodic params
@@ -82,6 +82,9 @@ if __name__ == "__main__":
         dfPSNR = pd.read_csv(f, sep=PSNR_CSV_SETUP["sep"], decimal=PSNR_CSV_SETUP["decimal"],
                              index_col=PSNR_CSV_SETUP["index"], lineterminator=PSNR_CSV_SETUP["line_terminator"])
 
+    # define instance of Preprocessor
+    preprocessor = Preprocessor()
+
     # Paths to files
     for idx in range(nrepeats):
         for s_amp in signal_amps:
@@ -89,8 +92,7 @@ if __name__ == "__main__":
                 path_train = {"folder": f"{root}/train", "name": f"X{idx}_sAmp{s_amp}_nAmp{n_amp}.npy"}
                 path_test = {"folder": f"{root}/test", "name": f"X{idx}_sAmp{s_amp}_nAmp{n_amp}.npy"}
 
-                # define instance of Preprocessor and initialize M2
-                preprocessor = Preprocessor()
+                # initialize M2
                 m2 = M2(preprocessor, from_existing_file=from_existing_file, nmeas=nmeas)
 
                 # Train the method on 2 months of neporuseno (trained)
