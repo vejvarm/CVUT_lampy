@@ -14,9 +14,9 @@ LOGGER = console_logger(__name__, "DEBUG")
 PSNR_CSV_SETUP = FLAGS.PSNR_csv_setup
 
 
-def generate_and_compute_snr(signal_gen, noise_gen, shape=(10, 15360)):
+def generate_and_compute_snr(signal_gen, noise_gen, shape=(10, 15360), omit=tuple()):
     assert len(shape) == 2, "given shape must be shape 2 Tuple or List"
-    signal = signal_gen.generate(*shape)
+    signal = signal_gen.generate(*shape, omit)
     noise = noise_gen.generate(*shape)
 
 #    s_power = np.sum(abs(signal)**2)/np.size(signal)
@@ -85,11 +85,11 @@ if __name__ == '__main__':
         for s_amp in signal_amps:
             for n_amp in noise_amps:
                 dtrain = {"nsig": 3, "fvs": (10., 80., 125.), "amp_range": s_amp,
-                          "shift_range": (0, 0), "path": f"{root}/train/"}
+                          "shift_range": (0, 0), "path": f"{root}/train/", "omit": (0, 1, 2)}
                 dtest = {"nsig": 6, "fvs": (10., 80., 125.), "amp_range": s_amp,
-                         "shift_range": (0, 0), "path": f"{root}/test/"}
+                         "shift_range": (0, 0), "path": f"{root}/test/", "omit": (0, 1, 2, 2, 1, 0)}
                 dtest_br = {"nsig": 6, "fvs": (7., 83., 122.), "amp_range": s_amp,
-                            "shift_range": (0, 0), "path": f"{root}/test/"}
+                            "shift_range": (0, 0), "path": f"{root}/test/", "omit": (2, 1, 0, 0, 1, 2) }
                 dnoise = {"fvs": np.arange(fs), "amp_range": n_amp, "shift_range": (0, 0)}
 
                 LOGGER.info("Initialising signal and noise generators.")
@@ -103,13 +103,24 @@ if __name__ == '__main__':
 
                 LOGGER.info("Generating signal values with added noise.")
                 t = np.arange(nsamples) / fs
-                x_train, PSNR_train = generate_and_compute_snr(g_train, g_noise, shape=(dtrain["nsig"], nsamples))
-                x_test_un, PSNR_test_un = generate_and_compute_snr(g_test, g_noise, shape=(dtest["nsig"], nsamples))
+                x_train, PSNR_train = generate_and_compute_snr(g_train, g_noise,
+                                                               shape=(dtrain["nsig"], nsamples),
+                                                               omit=dtrain["omit"])
+                x_test_un, PSNR_test_un = generate_and_compute_snr(g_test, g_noise,
+                                                                   shape=(dtest["nsig"], nsamples),
+                                                                   omit=dtest["omit"])
                 x_test_br, PSNR_test_br = generate_and_compute_snr(g_test_br, g_noise,
-                                                                   shape=(dtest_br["nsig"], nsamples))
+                                                                   shape=(dtest_br["nsig"], nsamples),
+                                                                   omit=dtest_br["omit"])
                 LOGGER.debug(f"x_train.shape: {x_train.shape}, "
                              f"x_test_un.shape: {x_test_un.shape}, "
                              f"x_test_br.shape: {x_test_br.shape}")
+
+                LOGGER.info("Splitting unshifted and shifted signal values to groups of 3.")
+                x_test_un_1 = x_test_un[0:3, :]
+                x_test_un_2 = x_test_un[3:, :]
+                x_test_br_1 = x_test_br[0:3, :]
+                x_test_br_2 = x_test_br[3:, :]
 
                 LOGGER.info("Zeroing out certain natural frequencies.")
 #                x_train = zero_out_freqs_pattern(x_train, fs, freqs=(dtrain["fvs"]))
@@ -139,6 +150,11 @@ if __name__ == '__main__':
                 psd_test_br = np.expand_dims(psd_test_br.T, axis=-1)
                 LOGGER.debug(f"psd_train.shape: {psd_train.shape}, psd_test.shape: {psd_test.shape}")
 
+                psd_test_un_1 = psd_test_un[0:3, :, :]
+                psd_test_un_2 = psd_test_un[3:, :, :]
+                psd_test_br_1 = psd_test_br[0:3, :, :]
+                psd_test_br_2 = psd_test_br[3:, :, :]
+
                 LOGGER.debug("Making folder if it doesn't exist")
                 os.makedirs(dtrain["path"], exist_ok=True)
                 os.makedirs(dtest["path"], exist_ok=True)
@@ -166,13 +182,16 @@ if __name__ == '__main__':
 
                 # Vykreslení výsledků
                 LOGGER.info("Plotting results.")
-                _, ax = plt.subplots(3, 1)
+                fig, ax = plt.subplots(5, 1)
+                fig.set_size_inches(6, 6)
                 LOGGER.info("Plotting noisy signals.")
                 plt.suptitle("Noisy signals"
                              f"\n signal: {s_amp}, noise: {n_amp}")
-                plotter(t, x_train.mean(0), ax[0], title="", ylabel="train")
-                plotter(t, x_test_un.mean(0), ax[1], title="", ylabel="unshift.")
-                plotter(t, x_test_br.mean(0), ax[2], title="", xlabel="time (s)", ylabel="shift.")
+                plotter(t, x_train.mean(0), ax[0], title="", ylabel="$y_b$")
+                plotter(t, x_test_un_1.mean(0), ax[1], title="", ylabel="$y_{u1}$")
+                plotter(t, x_test_un_2.mean(0), ax[2], title="", ylabel="$y_{u2}$")
+                plotter(t, x_test_br_1.mean(0), ax[3], title="", xlabel="", ylabel="$y_{s1}$")
+                plotter(t, x_test_br_2.mean(0), ax[4], title="", xlabel="time (s)", ylabel="$y_{s2}$.")
                 plt.tight_layout(rect=[0, 0.05, 1, 0.91])
                 LOGGER.info("Saving noisy signals plot.")
                 for ext in plot_exts:
@@ -184,13 +203,22 @@ if __name__ == '__main__':
                 X_train = abs(np.fft.fft(x_train, nfft))[:, :nfft // 2]
                 X_test_un = abs(np.fft.fft(x_test_un, nfft))[:, :nfft // 2]
                 X_test_br = abs(np.fft.fft(x_test_br, nfft))[:, :nfft // 2]
+
+                X_test_un_1 = X_test_un[0:3, :]
+                X_test_un_2 = X_test_un[3:, :]
+                X_test_br_1 = X_test_br[0:3, :]
+                X_test_br_2 = X_test_br[3:, :]
+
                 LOGGER.info("Plotting fft of noisy signals")
-                _, ax = plt.subplots(3, 1)
+                fig, ax = plt.subplots(5, 1)
+                fig.set_size_inches(6, 6)
                 plt.suptitle("Fourier spectra of noisy signals"
                              f"\n signal: {s_amp}, noise: {n_amp}")
-                plotter(freq_train, X_train.mean(0), ax[0], ylabel="abs(train)")
-                plotter(freq_test_un, X_test_un.mean(0), ax[1], ylabel="abs(unshift.)")
-                plotter(freq_test_br, X_test_br.mean(0), ax[2], xlabel="frequency (Hz)", ylabel="abs(shift.)")
+                plotter(freq_train, X_train.mean(0), ax[0], ylabel="$Y_{b}$")
+                plotter(freq_test_un, X_test_un_1.mean(0), ax[1], ylabel="$Y_{u1}$")
+                plotter(freq_test_un, X_test_un_2.mean(0), ax[2], ylabel="$Y_{u2}$")
+                plotter(freq_test_br, X_test_br_1.mean(0), ax[3], xlabel="", ylabel="$Y_{s1}$")
+                plotter(freq_test_br, X_test_br_2.mean(0), ax[4], xlabel="frequency (Hz)", ylabel="$Y_{s2}$")
                 plt.tight_layout(rect=[0, 0.05, 1, 0.91])
                 LOGGER.info("Saving fft of noisy signals plot.")
                 for ext in plot_exts:
@@ -199,13 +227,16 @@ if __name__ == '__main__':
 
                 # Preprocessing zašumělých signálů a jejich průměr
                 LOGGER.info("Plotting mean preprocessed spectral densities of noisy signals")
-                _, ax = plt.subplots(3, 1)
+                fig, ax = plt.subplots(5, 1)
+                fig.set_size_inches(6, 6)
                 plt.suptitle("Mean preprocessed spectral densities of noisy signals"
                              f"\n signal: {s_amp}, noise: {n_amp}")
-                plotter(freq_train, psd_train.mean(axis=(0, -1)), ax[0], ylabel="train")
-                plotter(freq_test_un, psd_test_un.mean(axis=(0, -1)), ax[1], ylabel="unshift.")
-                plotter(freq_test_br, psd_test_br.mean(axis=(0, -1)), ax[2], xlabel="frequency (Hz)",
-                        ylabel="shift.")
+                plotter(freq_train, psd_train.mean(axis=(0, -1)), ax[0], ylabel="$PSD_b$")
+                plotter(freq_test_un, psd_test_un_1.mean(axis=(0, -1)), ax[1], ylabel="$PSD_{u1}$")
+                plotter(freq_test_un, psd_test_un_2.mean(axis=(0, -1)), ax[2], ylabel="$PSD_{u2}$")
+                plotter(freq_test_br, psd_test_br_1.mean(axis=(0, -1)), ax[3], ylabel="$PSD_{s1}$")
+                plotter(freq_test_br, psd_test_br_2.mean(axis=(0, -1)), ax[4], xlabel="frequency (Hz)",
+                        ylabel="$PSD_{s2}$")
                 plt.tight_layout(rect=[0, 0.03, 1, 0.91])
                 LOGGER.info("Saving mean preprocessed spectral densities of noisy signals plot.")
                 for ext in plot_exts:
@@ -223,35 +254,38 @@ if __name__ == '__main__':
                     os.makedirs(f"{root}{subdirs[1]}", exist_ok=True)
                     os.makedirs(f"{root}{subdirs[2]}", exist_ok=True)
                     LOGGER.info("\t Training signals")
-                    _, ax = plt.subplots(1, 3)
+                    fig, ax = plt.subplots(1, 3)
+                    fig.set_size_inches(6.5, 2.5)
                     for j in range(3):
-                        plotter(t, x_train[j, :], ax[j], title=f"No. {j}", xlabel="time (s)")
-                    plt.suptitle("Training signals")
-                    ax[0].set_ylabel("day 1")
+                        plotter(t, x_train[j, :], ax[j], title=f"{j}", xlabel="time (s)")
+                    plt.suptitle("Baseline signals")
+                    ax[0].set_ylabel("$y_b$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[0]}/xn{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
 
                     LOGGER.info("\t Unshifted test signals")
-                    _, ax = plt.subplots(2, 3)
+                    fig, ax = plt.subplots(2, 3)
+                    fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(t, x_test_un[j, :], ax[j], title=f"No. {j}", xlabel="time (s)")
-                    plt.suptitle("Unshifted test signals")
-                    ax[0].set_ylabel("day 2")
-                    ax[3].set_ylabel("day 3")
+                        plotter(t, x_test_un[j, :], ax[j], title=f"{j}", xlabel="time (s)")
+                    plt.suptitle("Unshifted signals")
+                    ax[0].set_ylabel("$y_{u1}$")
+                    ax[3].set_ylabel("$y_{u2}$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[1]}/xn{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
 
                     LOGGER.info("\t Shifted test signals")
-                    _, ax = plt.subplots(2, 3)
+                    fig, ax = plt.subplots(2, 3)
+                    fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(t, x_test_br[j, :], ax[j], title=f"No. {j}", xlabel="time (s)")
-                    plt.suptitle("Shifted test signals")
-                    ax[0].set_ylabel("day 4")
-                    ax[3].set_ylabel("day 5")
+                        plotter(t, x_test_br[j, :], ax[j], title=f"{j}", xlabel="time (s)")
+                    plt.suptitle("Shifted signals")
+                    ax[0].set_ylabel("$y_{s1}$")
+                    ax[3].set_ylabel("$y_{s2}$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[2]}/xn{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
@@ -265,35 +299,38 @@ if __name__ == '__main__':
                     os.makedirs(f"{root}{subdirs[1]}", exist_ok=True)
                     os.makedirs(f"{root}{subdirs[2]}", exist_ok=True)
                     LOGGER.info("\t Training FFTs")
-                    _, ax = plt.subplots(1, 3)
+                    fig, ax = plt.subplots(1, 3)
+                    fig.set_size_inches(6.5, 2.5)
                     for j in range(3):
-                        plotter(freq_train, X_train[j, :], ax[j], title=f"No. {j}", xlabel="frequency (Hz)")
-                    plt.suptitle("Training FFTs")
-                    ax[0].set_ylabel("day 1")
+                        plotter(freq_train, X_train[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                    plt.suptitle("Baseline FFTs")
+                    ax[0].set_ylabel("$Y_b$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[0]}/fft{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
 
                     LOGGER.info("\t Unshifted test FFTs")
-                    _, ax = plt.subplots(2, 3)
+                    fig, ax = plt.subplots(2, 3)
+                    fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(freq_test_un, X_test_un[j, :], ax[j], title=f"No. {j}", xlabel="frequency (Hz)")
-                    plt.suptitle("Unshifted test FFTs")
-                    ax[0].set_ylabel("day 2")
-                    ax[3].set_ylabel("day 3")
+                        plotter(freq_test_un, X_test_un[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                    plt.suptitle("Unshifted FFTs")
+                    ax[0].set_ylabel("$Y_{u1}$")
+                    ax[3].set_ylabel("$Y_{u2}$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[1]}/fft{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
 
                     LOGGER.info("\t Shifted test FFTs")
-                    _, ax = plt.subplots(2, 3)
+                    fig, ax = plt.subplots(2, 3)
+                    fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(freq_test_br, X_test_br[j, :], ax[j], title=f"No. {j}", xlabel="frequency (Hz)")
-                    plt.suptitle("Shifted test FFTs")
-                    ax[0].set_ylabel("day 4")
-                    ax[3].set_ylabel("day 5")
+                        plotter(freq_test_br, X_test_br[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                    plt.suptitle("Shifted FFTs")
+                    ax[0].set_ylabel("$Y_{s1}$")
+                    ax[3].set_ylabel("$Y_{s2}$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[2]}/fft{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
@@ -307,35 +344,38 @@ if __name__ == '__main__':
                     os.makedirs(f"{root}{subdirs[1]}", exist_ok=True)
                     os.makedirs(f"{root}{subdirs[2]}", exist_ok=True)
                     LOGGER.info("\t Training PSDs")
-                    _, ax = plt.subplots(1, 3)
+                    fig, ax = plt.subplots(1, 3)
+                    fig.set_size_inches(6.5, 2.5)
                     for j in range(3):
-                        plotter(freq_train, psd_train[j, :], ax[j], title=f"No. {j}", xlabel="frequency (Hz)")
-                    plt.suptitle("Training PSDs")
-                    ax[0].set_ylabel("day 1")
+                        plotter(freq_train, psd_train[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                    plt.suptitle("Baseline PSDs")
+                    ax[0].set_ylabel("$PSD_b$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[0]}/PSD{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
 
                     LOGGER.info("\t Unshifted test PSDs")
-                    _, ax = plt.subplots(2, 3)
+                    fig, ax = plt.subplots(2, 3)
+                    fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(freq_test_un, psd_test_un[j, :], ax[j], title=f"No. {j}", xlabel="frequency (Hz)")
-                    plt.suptitle("Unshifted test PSDs")
-                    ax[0].set_ylabel("day 2")
-                    ax[3].set_ylabel("day 3")
+                        plotter(freq_test_un, psd_test_un[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                    plt.suptitle("Unshifted PSDs")
+                    ax[0].set_ylabel("$PSD_{u1}$")
+                    ax[3].set_ylabel("$PSD_{u2}$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[1]}/PSD{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
 
                     LOGGER.info("\t Shifted test PSDs")
-                    _, ax = plt.subplots(2, 3)
+                    fig, ax = plt.subplots(2, 3)
+                    fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(freq_test_br, psd_test_br[j, :], ax[j], title=f"No. {j}", xlabel="frequency (Hz)")
-                    plt.suptitle("Shifted test PSDs")
-                    ax[0].set_ylabel("day 4")
-                    ax[3].set_ylabel("day 5")
+                        plotter(freq_test_br, psd_test_br[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                    plt.suptitle("Shifted PSDs")
+                    ax[0].set_ylabel("$PSD_{s1}$")
+                    ax[3].set_ylabel("$PSD_{s2}$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     for ext in plot_exts:
                         plt.savefig(f"{root}{subdirs[2]}/PSD{i}_sAmp{s_amp}_nAmp{n_amp}{ext}")
