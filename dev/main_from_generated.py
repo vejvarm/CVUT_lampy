@@ -21,6 +21,7 @@ _NOISE_AMP = PSNR_CSV_SETUP["columns"][2]
 _TRAIN_PSNR = PSNR_CSV_SETUP["columns"][-2]
 _TEST_PSNR = PSNR_CSV_SETUP["columns"][-1]
 
+
 def calc_periodic_best(ce, bin_sizes, thresholds):
     nperiods, nparams = ce.shape
     nth = len(thresholds)
@@ -55,7 +56,7 @@ if __name__ == "__main__":
     # DATA LOADING SETTINGS
     nrepeats = 1
     signal_amps = [(0.75, 1)]
-    noise_amps = [(0, 0.5)]
+    noise_amps = [(0.0, 0.5)]
     root = "../data/for_article/generated"
 
     # PARAMS
@@ -63,7 +64,7 @@ if __name__ == "__main__":
 
     # multiscale params
     bin_sizes = (32, 64, 128, )
-    thresholds = (0.001, 0.5, 2.5, )
+    thresholds = (0.5, 2.5, )
     plot_distributions = False
 
     # periodic params
@@ -132,13 +133,15 @@ if __name__ == "__main__":
                 # plot the results of cummulative cross-entropies and their regression
                 LOGGER.info("Plotting resulting MCCE")
                 fig = plt.figure()
-                plt.plot(x23, a2*x23 + b2, "b", label=f"regress. unshifted frequencies (α={a2:.1f})")
-                plt.plot(x23, a3*x23 + b3, "r", label=f"regress. shifted frequencies (α={a3:.1f})")
-                plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of freq. unshifted signals")
-                plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of freq. shifted signals")
+                plt.plot(x23, a2*x23 + b2, "b", label=f"$r_u$ (α={a2:.1f})")
+                plt.plot(x23, a3*x23 + b3, "r", label=f"$r_s$ (α={a3:.1f})")
+                plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of $PSD_{ui}$")
+                plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of $PSD_{si}$")
                 plt.ylim([0, None])
-                plt.xlabel(f"days (period = {period} " + ("day" if period == 1 else "days") + ")")
+                plt.xlabel("signal group")
                 plt.ylabel("MCCE")
+                plt.xticks(np.arange(ndays))
+                plt.gca().set_xticklabels(["u1", "u2", "s1", "s2"])
                 plt.title(f"MCCE with regression \n (PSNR: {psnr:.2f} dB | dα: {rel_diff:.2f} %)")
                 plt.legend()
                 plt.grid()
@@ -163,8 +166,8 @@ if __name__ == "__main__":
                             for i, ax in enumerate(axes.flatten()):
                                 y_pos = np.arange(len(d[i, :]))
                                 ax.bar(y_pos, d[i, :], align="center", width=0.9)
-                                ax.set_xlabel("bin number")
-                                ax.set_ylabel("Softmax(psd_binarized) (1)")
+                                ax.set_xlabel("bin")
+                                ax.set_ylabel("$psd_{bin}$")
                                 ax.set_yscale("log")
                             fig.suptitle(f"Binarized spectrum | bin size: {params[0]} | threshold: {params[1]} |")
                             flnm = f"../images/M2/binarized-spectra/binarized_spectrum_bs-{params[0]}_th-{params[1]}"
