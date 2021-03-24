@@ -86,9 +86,6 @@ class Method:
                     psd = psd[self.acc_slice, :, :]
 
                     mean, var = self._calc_mean_and_var(psd, period)
-                    print(psd.shape)
-                    print(mean.shape)
-                    print(var.shape)
                     break
             elif self.from_existing_file and "X" in path and ".npy" in path:
                 nlamps = FLAGS.nlamps

@@ -3,6 +3,12 @@ class FLAGS:
     nlamps = 1  # for new X_li.npy files use 1, for old X.npy use 3
     naccs_per_lamp = 2
 
+    LAMPS_GRID = ["l1", "l2"]  # "l3"]
+    BIN_SIZE_GRID = [(8, ), ]  # (16, ), (32, ), (64, )]
+    THRESHOLD_GRID = [(0.01, ), ]  # (0.1, ), (1., ), (2, ), (4, )]
+    PERIOD_GRID = [1, ]  # 7, 14, 28]
+    VAR_SCALED_GRID = [True, ]  # False]
+
     preproc_default = {
         "fs": 1000,  # Hz
         "ns_per_hz": 10,
@@ -12,7 +18,7 @@ class FLAGS:
         "use_autocorr": True,
         "noise_f_rem": (1,),
         "noise_df_rem": (1,),
-        "mov_filt_size": 5,
+        "mov_filt_size": 10,
         "rem_neg": True,
     }
 
@@ -26,6 +32,7 @@ class FLAGS:
     data_root = "b:/!Cloud/OneDrive - VŠCHT/CVUT_Lampy/data/"
     raw_folder = "raw"
     preprocessed_folder = "preprocessed"
+    image_save_folder = "results/images"
 
     paths = {
         "training": {"folder": "training",
