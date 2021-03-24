@@ -52,6 +52,29 @@ def linear_regression(y, x=None):
     return a, b
 
 
+def plot_distributions_fn(distributions, save_path="../images/M2/binarized-spectra/"):
+    save_path = os.path.normpath(save_path)
+    os.makedirs(save_path, exist_ok=True)
+    for j, dist in enumerate((distributions, )):
+        for params, freqs, d in dist:
+            nrows = 1
+            ncols = 1
+            fig, axes = plt.subplots(nrows, ncols)
+            if nrows + ncols == 2:
+                axes = np.array([axes])
+            for i, ax in enumerate(axes.flatten()):
+                y_pos = np.arange(len(d[i, :]))
+                ax.bar(y_pos, d[i, :], align="center", width=0.9)
+                ax.set_xlabel("bin")
+                ax.set_ylabel("$psd_{bin}$")
+                ax.set_yscale("log")
+            fig.suptitle(f"Binarized spectrum | bin size: {params[0]} | threshold: {params[1]} |")
+            flnm = f"{save_path}/binarized_spectrum_bs-{params[0]}_th-{params[1]}"
+            plt.savefig(f"{flnm}.png", dpi=200)
+            plt.savefig(f"{flnm}.pdf")
+            plt.savefig(f"{flnm}.svg")
+
+
 if __name__ == "__main__":
     # DATA LOADING SETTINGS
     nrepeats = 1
@@ -63,9 +86,14 @@ if __name__ == "__main__":
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (32, 64, 128, )
-    thresholds = (0.5, 2.5, )
-    plot_distributions = False
+    bin_sizes = (48, )
+    thresholds = (0.5, )
+    plot_distributions = True
+
+    if len(bin_sizes)*len(thresholds) == 1:
+        method_name = "CCE"
+    else:
+        method_name = "MCCE"
 
     # periodic params
     period = 1
@@ -131,24 +159,24 @@ if __name__ == "__main__":
                 LOGGER.debug(f"PSNR value: {psnr}")
 
                 # plot the results of cummulative cross-entropies and their regression
-                LOGGER.info("Plotting resulting MCCE")
+                LOGGER.info(f"Plotting resulting {method_name}")
                 fig = plt.figure()
                 plt.plot(x23, a2*x23 + b2, "b", label=f"$r_u$ (α={a2:.1f})")
                 plt.plot(x23, a3*x23 + b3, "r", label=f"$r_s$ (α={a3:.1f})")
-                plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of $PSD_{ui}$")
-                plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label="MCCE of $PSD_{si}$")
+                plt.stem(y2, markerfmt="bx", linefmt="none", basefmt=" ", use_line_collection=True, label=f"{method_name} of $PSD_u$")
+                plt.stem(x3, y3, markerfmt="r+", linefmt="none", basefmt=" ", use_line_collection=True, label=f"{method_name} of $PSD_s$")
                 plt.ylim([0, None])
                 plt.xlabel("signal group")
-                plt.ylabel("MCCE")
+                plt.ylabel(f"{method_name}")
                 plt.xticks(np.arange(ndays))
                 plt.gca().set_xticklabels(["u1", "u2", "s1", "s2"])
-                plt.title(f"MCCE with regression \n (PSNR: {psnr:.2f} dB | dα: {rel_diff:.2f} %)")
+                plt.title(f"{method_name} with regression \n (PSNR: {psnr:.2f} dB | dα: {rel_diff:.2f} %)")
                 plt.legend()
                 plt.grid()
 
                 # save the resulting plot
                 LOGGER.info("Saving current plot")
-                flnm = f"../images/M2/cce_nd-{ndays}_p-{period}_i_{idx}_sAmp{s_amp}_nAmp{n_amp}"
+                flnm = f"../images/M2/cce_{bin_sizes}-{thresholds}"
                 plt.savefig(f"{flnm}.png", dpi=200)
                 plt.savefig(f"{flnm}.pdf")
                 plt.savefig(f"{flnm}.svg")
@@ -156,24 +184,14 @@ if __name__ == "__main__":
                 # if plot distributions:
                 if plot_distributions:
                     LOGGER.info("Plotting trained binarized distributions")
-                    for j, dist in enumerate((m2.trained_distributions, )):
-                        for params, freqs, d in dist:
-                            nrows = 1
-                            ncols = 1
-                            fig, axes = plt.subplots(nrows, ncols)
-                            if nrows+ncols == 2:
-                                axes = np.array([axes])
-                            for i, ax in enumerate(axes.flatten()):
-                                y_pos = np.arange(len(d[i, :]))
-                                ax.bar(y_pos, d[i, :], align="center", width=0.9)
-                                ax.set_xlabel("bin")
-                                ax.set_ylabel("$psd_{bin}$")
-                                ax.set_yscale("log")
-                            fig.suptitle(f"Binarized spectrum | bin size: {params[0]} | threshold: {params[1]} |")
-                            flnm = f"../images/M2/binarized-spectra/binarized_spectrum_bs-{params[0]}_th-{params[1]}"
-                            plt.savefig(f"{flnm}.png", dpi=200)
-                            plt.savefig(f"{flnm}.pdf")
-                            plt.savefig(f"{flnm}.svg")
+                    plot_distributions_fn(m2.trained_distributions, "../images/M2/binarized-spectra/trained/")
+                    print(m2.trained_distributions)
+
+                    LOGGER.info("Plotting validation binarized distributions")
+                    valid_distributions = m2.get_multiscale_distributions(os.path.join(*list(path_test.values())),
+                                                                            bin_sizes, thresholds, period)
+                    print(valid_distributions)
+                    plot_distributions_fn(valid_distributions[-1], "../images/M2/binarized-spectra/valid/")
     LOGGER.info(f"Adding dα column to dfPSNR")
     dfPSNR["da (%)"] = pd.Series(rel_diff_list, index=dfPSNR.index)
     LOGGER.info(f"Saving updated dfPSNR")

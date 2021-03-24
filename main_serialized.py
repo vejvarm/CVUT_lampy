@@ -1,3 +1,5 @@
+import os
+
 from collections import Counter
 
 from bin.flags import FLAGS
@@ -40,27 +42,26 @@ def linear_regression(y, x=None):
 
 
 if __name__ == "__main__":
+    root = os.path.join(FLAGS.data_root, FLAGS.preprocessed_folder)
     # Paths to training files
     setting = "training"
     folder = FLAGS.paths[setting]["folder"]
     dataset = FLAGS.paths[setting]["dataset"]
     period = [FLAGS.paths[setting]["period"]]*len(dataset)
-    filename = ["X_l2.npy"]*len(dataset)
-    paths = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
+    paths = [os.path.join(root, folder, d, p) for d, p in zip(dataset, period)]
 
     # Paths to validation files
     setting_valid = "serialized"
     folder = FLAGS.paths[setting_valid]["folder"]
     dataset = FLAGS.paths[setting_valid]["dataset"]
     period = [FLAGS.paths[setting_valid]["period"]]*len(dataset)
-    filename = ["X_l2.npy"] * len(dataset)
-    paths_valid = [f"./{folder}/{d}/{p}/{f}" for d, p, f in zip(dataset, period, filename)]
+    paths_valid = [os.path.join(root, folder, d, p) for d, p in zip(dataset, period)]
 
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (10, 20, 40, 80,)
-    thresholds = (0.1, 1., 10.)
+    bin_sizes = (8, )
+    thresholds = (0.01, )
     plot_distributions = False
 
     # periodic params
@@ -72,7 +73,7 @@ if __name__ == "__main__":
 
     # define instance of Preprocessor and initialize M2
     preprocessor = Preprocessor()
-    m2 = M2(preprocessor, from_existing_file=from_existing_file)
+    m2 = M2(preprocessor, from_existing_file=from_existing_file, from_preprocessed=True, lamp="l2", var_scaled_PSD=True)
 
     # Train the method on 2 months of neporuseno (trained)
     m2.train(paths[0], bin_sizes, thresholds)

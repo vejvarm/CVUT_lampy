@@ -1,4 +1,5 @@
 import os
+import re
 from copy import deepcopy
 
 import numpy as np
@@ -14,7 +15,6 @@ from bin.helpers import console_logger
 
 LOGGER = console_logger(__name__, "WARNING")
 
-
 def _remove_negative(psd_arr):
     """
     Remove negative values from psd
@@ -26,18 +26,28 @@ def _remove_negative(psd_arr):
 
 
 class Preprocessor:
+    fs_default = FLAGS.preproc_default["fs"]
+    ns_per_hz_default = FLAGS.preproc_default["ns_per_hz"]
+    freq_range_default = FLAGS.preproc_default["freq_range"]
+    tdf_order_default = FLAGS.preproc_default["tdf_order"]
+    tdf_ranges_default = FLAGS.preproc_default["tdf_ranges"]
+    use_autocorr_default = FLAGS.preproc_default["use_autocorr"]
+    noise_f_rem_default = FLAGS.preproc_default["noise_f_rem"]
+    noise_df_rem_default = FLAGS.preproc_default["noise_df_rem"]
+    mov_filt_size_default = FLAGS.preproc_default["mov_filt_size"]
+    rem_neg_default = FLAGS.preproc_default["rem_neg"]
 
     def __init__(self,
-                 fs=512,
-                 ns_per_hz=10,
-                 freq_range=(0, 256),
-                 tdf_order=5,
-                 tdf_ranges=((45, 55), (95, 105), (145, 155), (195, 205)),
-                 use_autocorr=True,
-                 noise_f_rem=(0, ),
-                 noise_df_rem=(0, ),
-                 mov_filt_size=5,
-                 rem_neg=True):
+                 fs=fs_default,
+                 ns_per_hz=ns_per_hz_default,
+                 freq_range=freq_range_default,
+                 tdf_order=tdf_order_default,
+                 tdf_ranges=tdf_ranges_default,
+                 use_autocorr=use_autocorr_default,
+                 noise_f_rem=noise_f_rem_default,
+                 noise_df_rem=noise_df_rem_default,
+                 mov_filt_size=mov_filt_size_default,
+                 rem_neg=rem_neg_default):
         """
 
         :param fs: (int) sampling frequency of the acquisition
@@ -74,7 +84,7 @@ class Preprocessor:
     def get_config_values(self):
         return tuple(self.__dict__.values())
 
-    def run(self, paths, return_as='dict', plot_semiresults=False, every=1, nmeas=None, savefolder=None):
+    def run(self, paths, return_as='dict', plot_semiresults=False, every=1, nmeas=None, plot_savefolder=None, npy_save_folder=None, verbosity=0):
         """
 
         :param paths: (list/tuple) strings of paths leading to .mat files or folder with .mat files for loading
@@ -82,13 +92,22 @@ class Preprocessor:
         :param plot_semiresults: if True, make a plot after each preprocessing operation
         :param every: if > 1, only every 'every'eth acc will be plotted (e.g. every=2 means that every 2nd acc is plotted)
         :param nmeas: if None, take all measurements available in file, if (int), take first nmeas measurements
-        :param savefolder: if None, don't save pdf of plot, else save pdf of plot to savefolder
+        :param plot_savefolder: if None, don't save pdf of plot, else save pdf of plot to plot_savefolder
+        :param npy_save_folder: if None, don't save individual npy files but instead return colletive dict/npy array
+        :param verbosity: if >0, print individual save paths as the files are preprocessed
         :return preprocessed:
-            if return_as == 'dict': Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]] dict of preprocessed files
-            if return_as == 'ndarray': Tuple[1Darray[nfft/2, ], 4Darray[nfiles, naccs, nfft/2, nmeas]]
+            if npy_save_folder is not None: Tuple[None, None]
+            else:
+                if return_as == 'dict': Dict[file_name: Tuple[freq, psd, wind_dir, wind_spd]] dict of preprocessed files
+                if return_as == 'ndarray': Tuple[1Darray[nfft/2, ], 4Darray[nfiles, naccs, nfft/2, nmeas]]
         """
 
         preprocessed = dict()
+
+        if npy_save_folder:
+            print("npy_save_folder is not None!")
+            print("Return will be empty as the individual preprocessed arrays are saved into numpy files instead!")
+            print("If you want to return collective dict/array, set 'npy_save_folder=None'")
 
         # for .npy file path!
         if ".npy" in os.path.splitext(paths[0])[-1]:
@@ -106,6 +125,7 @@ class Preprocessor:
                 # leads to folder ... load all .mat files from it
                 path_gen = os.walk(path)
                 for p, sub, files in path_gen:
+                    subfolder = os.path.split(p)[-1]
                     mat_files = [file for file in files if os.path.splitext(file)[-1] == ".mat"]
                     with tqdm(desc=f"Processing files in folder {p}", total=len(mat_files), unit="file") as pbar:
                         for file in mat_files:
@@ -113,33 +133,47 @@ class Preprocessor:
                             if f_ext == '.mat':
                                 fullpath = os.path.join(p, file)
                                 freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(fullpath, plot_semiresults, every, nmeas)
-                                preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
+                                if npy_save_folder:
+                                    psd_arr = np.array(psd_list)
+                                    full_npy_to_subfolder = os.path.join(npy_save_folder, subfolder)
+                                    os.makedirs(full_npy_to_subfolder, exist_ok=True)
+                                    full_npy_save_path = os.path.join(full_npy_to_subfolder, f"{f_name}.npy")
+                                    np.save(full_npy_save_path, psd_arr)
+                                    if verbosity:
+                                        print(f"Preprocessed array saved to: {full_npy_save_path}")
+                                else:
+                                    preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
                             pbar.update(1)
             elif os.path.splitext(path)[-1] == '.mat':
                 # leads to .mat file ... load directly
                 freq_vals, psd_list, wind_dir, wind_spd = self._preprocess(path, plot_semiresults, every, nmeas)
                 f_name = os.path.splitext(os.path.basename(path))[0]
                 preprocessed[f_name] = (freq_vals, psd_list, wind_dir, wind_spd)
-                # save plot to savefolder
-                if plot_semiresults and savefolder:
-                    os.makedirs(savefolder, exist_ok=True)
-                    plt.savefig(os.path.join(savefolder, f"{f_name}.pdf"))
+                # save plot to plot_savefolder
+                if plot_semiresults and plot_savefolder:
+                    os.makedirs(plot_savefolder, exist_ok=True)
+                    plt.savefig(os.path.join(plot_savefolder, f"{f_name}.pdf"))
             else:
                 print("Given path doesn't refer to .mat file or folder with .mat files. \n Ignoring path.")
                 continue
 
-        if return_as == 'dict':
-            return preprocessed
-        elif return_as == 'ndarray':
-            for key, (freqs, psd_list, _, _) in preprocessed.items():
-                psd_array = np.array(psd_list)
-                if 'psd_stacked' in locals():
-                    psd_stacked = np.concatenate((np.expand_dims(psd_array, 0), psd_stacked))
-                else:
-                    psd_stacked = np.expand_dims(psd_array, 0)
-            return freqs, psd_stacked
+        if npy_save_folder:
+            np.save(os.path.join(full_npy_to_subfolder, f"freqs.npy"), freq_vals)
+            print(f"Preprocessed files saved to: {npy_save_folder}")
+            return None, None
         else:
-            raise AttributeError("return_as should be either 'dict' or 'ndarray'")
+            if return_as == 'dict':
+                return preprocessed
+            elif return_as == 'ndarray':
+                for key, (freqs, psd_list, _, _) in preprocessed.items():
+                    psd_array = np.array(psd_list)
+                    if 'psd_stacked' in locals():
+                        psd_stacked = np.concatenate((np.expand_dims(psd_array, 0), psd_stacked))
+                    else:
+                        psd_stacked = np.expand_dims(psd_array, 0)
+                return freqs, psd_stacked
+            else:
+                raise AttributeError("return_as should be either 'dict' or 'ndarray'")
 
     def simple_preprocess(self, arr):
         """
@@ -211,6 +245,8 @@ class Preprocessor:
         ax[0, 1].set_ylabel(f"psd({label1})")
         ax[1, 0].set_ylabel(label2)
         ax[1, 1].set_ylabel(f"psd({label2})")
+        ax[0, 1].set_yscale("log")
+        ax[1, 1].set_yscale("log")
 
         plt.subplots_adjust(top=0.886,
                             bottom=0.121,
@@ -242,17 +278,20 @@ class Preprocessor:
         freq_vals = [[]]*naccs
         psd_list = [[]]*naccs
 
-        acc = [df[f'Acc{i}'] for i in range(1, naccs + 1)]
+        acc_keys = [k for k in df.keys() if re.match(FLAGS.mat_field_names["Accs"], k) is not None]
+        fs_key = [k for k in df.keys() if re.match(FLAGS.mat_field_names["fs"], k) is not None][0]
+
+        acc = [df[k] for k in acc_keys]
 
         if nmeas:
             for i in range(naccs):
                 acc[i] = acc[i][:, :nmeas]
 
         # check if self.fs fits to value of 'FrekvenceSignalu'
-        assert df['FrekvenceSignalu'] == self.fs, f"Value of 'FrekvenceSignalu' in {fullpath2file} doesn't correspond with self.fs ({self.fs} Hz)"
+        assert df[fs_key] == self.fs, f"Value of 'FrekvenceSignalu' in {fullpath2file} doesn't correspond with self.fs ({self.fs} Hz)"
 
         # initialize plot if 'plot_semiresults' == True
-        nops = 6 - int(not self.use_autocorr) - int(not self.rem_neg)  # number of preprocessing operations (for plotting)
+        nops = 7 - int(not self.use_autocorr) - int(not self.rem_neg)  # number of preprocessing operations (for plotting)
         if plot_semiresults:
             ncols = naccs//every
             fig, ax = plt.subplots(nops, ncols)
@@ -301,21 +340,21 @@ class Preprocessor:
             freq_vals[i], psd = self._calc_psd(arr)
 
             # remove noise based on values in self.noise_f_rem and self.noise_df_rem
-#            psd = self._remove_noise(psd, replace_with="min")
-#            self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
-#                                  xlabel='frekvence(Hz)', ylabel='psd', title='freq domain filtering')
+            psd = self._remove_noise(psd, replace_with="min")
+            self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
+                                   xlabel='frekvence(Hz)', ylabel='psd', title='freq domain filtering', scale='log')
 
             # normalize 'psd' to mean==0 and variance==1
             psd = (psd - psd.mean())/psd.std()
             self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
                                    xlabel='frekvence(Hz)', ylabel='psd', key="04_psd_norm",
-                                   title='normalizovaná výkonová spektrální hustota (psd)')
+                                   title='normalizovaná výkonová spektrální hustota (psd)', scale='log')
 
             # use moving average to smooth out the spectrum and remove noise
             psd = self._coarse_grain(psd)
             self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
                                    xlabel='frekvence(Hz)', ylabel='psd_norm', key="05_psd_cg",
-                                   title=f'klouzavý průměr s krokem {self.mov_filt_size}')
+                                   title=f'klouzavý průměr s krokem {self.mov_filt_size}', scale='log')
 
             # remove trend
             psd = self._detrend(freq_vals[i], psd)
@@ -325,7 +364,7 @@ class Preprocessor:
                 psd = self._remove_negative(psd)
                 self._conditional_plot(freq_vals[i], psd.mean(axis=1), plot_semiresults, ax, i, every,
                                        xlabel='frekvence(Hz)', ylabel='psd_noneg', key="06_psd_noneg",
-                                       title='odstranění trendu a negativních hodnot')
+                                       title='odstranění trendu a negativních hodnot', scale='log')
 
             # remove everything lower than mode:
 #            psd = self._remove_below_mode(psd)
@@ -367,10 +406,10 @@ class Preprocessor:
         :return: (dict) structure with the files
 
         expected structure of data:
-        :key 'Acc1': 2D float array [15360, 144] (1st lamp, 1st direction)
-        :key 'Acc2': 2D float array [15360, 144] (1st lamp, 2nd direction)
+        :key 'Acc1o': 2D float array [15360, 144] (1st lamp, 1st direction)
+        :key 'Acc2o': 2D float array [15360, 144] (1st lamp, 2nd direction)
         ...
-        :key 'Acc6': 2D float array [15360, 144] (3rd lamp, 2nd direction)
+        :key 'Acc6o': 2D float array [15360, 144] (3rd lamp, 2nd direction)
         :key 'FrekvenceSignalu': 1D uint16 array [1] (512 Hz)
         :key 'WindDirection': 1D string array [144] (dir. of wind described by characters N, S, E, W)
         :key 'WindSpeed': 1D float array [144] (speed of the wind)
@@ -577,7 +616,7 @@ if __name__ == '__main__':
 
     p = Preprocessor(use_autocorr=autocorr, rem_neg=rem_neg)
 
-    freqs, psd = p.run(["data/trening/neporuseno/2months/08072018_AccM.mat"], return_as="ndarray",
+    freqs, psd = p.run(["B:/!Cloud/OneDrive - VŠCHT/CVUT_Lampy/data/raw/neporuseno/20180810_Acc_1000.mat"], return_as="ndarray",
                        plot_semiresults=plot_semiresults, every=every, nmeas=nmeas, savefolder=plot_save_folder)
 
 

@@ -3,23 +3,47 @@ class FLAGS:
     nlamps = 1  # for new X_li.npy files use 1, for old X.npy use 3
     naccs_per_lamp = 2
 
+    preproc_default = {
+        "fs": 1000,  # Hz
+        "ns_per_hz": 10,
+        "freq_range": (0, 500),
+        "tdf_order": 5,
+        "tdf_ranges": ((45, 55), (95, 105), (145, 155), (195, 205), (245, 255), (295, 305), (345, 355), (395, 405), (445, 455)),
+        "use_autocorr": True,
+        "noise_f_rem": (1,),
+        "noise_df_rem": (1,),
+        "mov_filt_size": 5,
+        "rem_neg": True,
+    }
+
+    mat_field_names = {
+        "Accs": r"Acc\d[a-zA-Z]?",
+        "fs": r"Frekvence(Mereneho)?Signalu",
+        "WindDirection": "WindDirection",
+        "WindSpeed": "WindSpeed",
+    }
+
+    data_root = "b:/!Cloud/OneDrive - VŠCHT/CVUT_Lampy/data/"
+    raw_folder = "raw"
+    preprocessed_folder = "preprocessed"
+
     paths = {
-        "training": {"folder": "data/trening",
-                     "dataset": ["neporuseno", "neporuseno2", "poruseno"],
+        "training": {"folder": "training",
+                     "dataset": [""],
                      "period": "2months"
                      },
-        "validation": {"folder": "data/validace",
+        "validation": {"folder": "validace",
                        "dataset": ["neporuseno", "poruseno"],
                        "period": ""
                        },
-        "serialized": {"folder": "data/serialized",
+        "serialized": {"folder": "serialized",
                        "dataset": [""],
                        "period": ""
                        }
     }
 
-    serialized = {"unbroken": 86,
-                  "broken": 140}
+    serialized = {"unbroken": 107,
+                  "broken": 93}  # TODO: Change if needed
 
     lamps = {
         "l1": ("X_l1.npy", "y_l1.npy"),

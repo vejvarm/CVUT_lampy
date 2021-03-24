@@ -12,17 +12,30 @@ from bin.Preprocessor import Preprocessor
 
 LOGGER = console_logger(__name__, "WARNING")
 
+
 class Method:
 
-    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, nmeas=144):
+    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, nmeas=144, from_preprocessed=False, lamp="l1"):
         """
         :param preprocessor: (obj) Preprocessor class instance which determines how to preprocess PSD files
         :param from_existing_file: (bool) whether to try to load from existing files or ignore them
         :param nmeas: (int) number of measurements in one day
+        :param from_preprocessed: (bool) whether we are loading already preprocessed files or not
+        :param lamp: (str) which lamp is to be processed?
         """
         self.preprocessor = preprocessor
         self.from_existing_file = from_existing_file
         self.nmeas = nmeas
+        self.from_preprocessed = from_preprocessed
+        self.lamp = lamp
+        if "l1" in self.lamp.lower():
+            self.acc_slice = slice(0, 2)
+        elif "l2" in self.lamp.lower():
+            self.acc_slice = slice(2, 4)
+        elif "l3" in self.lamp.lower():
+            self.acc_slice = slice(4, None)
+        else:
+            raise ValueError("lamp has to be one of 'l1', 'l2' or 'l3'")
 
     def _calc_mean_and_var(self, psd, period=None):
         naccs, nfft, ndm = psd.shape
@@ -61,7 +74,23 @@ class Method:
         path_to_vars = folder_path + "/PSDvar.npy"
 
         try:
-            if self.from_existing_file and "X" in path and ".npy" in path:
+            if self.from_preprocessed:
+                pth_gen = os.walk(path)
+                for root, subs, files in pth_gen:
+                    freqs = np.load(os.path.join(root, files.pop(files.index("freqs.npy"))))  # load frequency file
+                    psd = [np.load(os.path.join(root, file)) for file in files if ".npy" in os.path.splitext(file)[-1]]
+
+                    psd = np.dstack(psd)
+
+                    # choose only specific lamp
+                    psd = psd[self.acc_slice, :, :]
+
+                    mean, var = self._calc_mean_and_var(psd, period)
+                    print(psd.shape)
+                    print(mean.shape)
+                    print(var.shape)
+                    break
+            elif self.from_existing_file and "X" in path and ".npy" in path:
                 nlamps = FLAGS.nlamps
                 freqs, X = self.preprocessor.run([path], return_as="ndarray")
 
@@ -216,8 +245,8 @@ class M1(Method):
 
 class M2(Method):
 
-    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, nmeas=144, var_scaled_PSD=False):
-        super(M2, self).__init__(preprocessor, from_existing_file=from_existing_file, nmeas=nmeas)
+    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, nmeas=144, var_scaled_PSD=False, from_preprocessed=False, lamp="l1"):
+        super(M2, self).__init__(preprocessor, from_existing_file=from_existing_file, nmeas=nmeas, from_preprocessed=from_preprocessed, lamp=lamp)
 
         self.bin_sizes = None
         self.thresholds = None

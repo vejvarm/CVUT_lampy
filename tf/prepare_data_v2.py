@@ -4,20 +4,23 @@ import numpy as np
 
 from bin.flags import FLAGS
 
+# physical settings
+NLAMPS = 3
+NACCS_PER_LAMP = 6
+
+# dataset settings
+SETTINGS = ["training", "validation", "serialized"]
+
+# save to individual files into given folder:
+NPY_SAVE_FOLDER = "d:/!private/Lord/git/cvuT_lampy/data/for_article/serialized/"
+
 if __name__ == '__main__':
 
-    # physical settings
-    nlamps = 3
-    naccs_per_lamp = 6
-
-    settings = ["training", "validation", "serialized"][-1:]
+    settings = SETTINGS[-1:]
     print(settings)
 
-    ndays_unbroken = FLAGS.serialized["unbroken"]
-    ndays_broken = FLAGS.serialized["broken"]
-
     # path settings
-    root = ".."
+    root = FLAGS.data_root
     # setting = "training"  # "training" or "validation"
     for setting in settings:
         folder = FLAGS.paths[setting]["folder"]
@@ -37,7 +40,7 @@ if __name__ == '__main__':
             psd_array = psd_array.transpose(0, 3, 2, 1).reshape(ndays*nmeas, nfft, naccs)
 
             # split into accs from different lamp posts (there are 3 lamps, each with 2 accs)
-            psd_array_split = np.split(psd_array, nlamps, axis=-1)
+            psd_array_split = np.split(psd_array, NLAMPS, axis=-1)
 
             for i, psd_array in enumerate(psd_array_split):
                 # generate labels (0 if neporuseno, 1 if poruseno)
@@ -52,8 +55,8 @@ if __name__ == '__main__':
                 elif "serialized" in setting:
                     # for serialized scenario
                     print("running scenario for serialized folder")
-                    ndays_unbroken = 86
-                    ndays_broken = 140
+                    ndays_unbroken = FLAGS.serialized["unbroken"]
+                    ndays_broken = FLAGS.serialized["broken"]
                     labels = np.concatenate((np.zeros((ndays_unbroken*nmeas, ), dtype=np.float32),
                                              np.ones((ndays_broken*nmeas, ), dtype=np.float32)))
                 else:
