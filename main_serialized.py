@@ -168,4 +168,4 @@ if __name__ == "__main__":
 
                         print(" DONE ".center(PRINT_FILL_SIZE, "#")+"\n")
 
-        df.to_csv(os.path.join(FULL_IMAGE_SAVE_FOLDER, f"da_{lamp}_results.csv"))
+        df.to_csv(os.path.join(FULL_IMAGE_SAVE_FOLDER, f"da_{lamp}_results.csv"), sep="\t", index=False)
