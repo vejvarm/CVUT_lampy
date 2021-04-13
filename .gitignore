@@ -8,3 +8,5 @@ __pycache__/
 results/
 
 images/M2/
+
+bin/flags.py
