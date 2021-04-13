@@ -4,15 +4,11 @@ from bin.Preprocessor import Preprocessor
 
 from bin.flags import FLAGS
 
-# physical settings
-NLAMPS = 3
-NACCS_PER_LAMP = 6
-
 # dataset settings
 SETTINGS = ["training", "validation", "serialized"]
 
 # save to individual files into given folder:
-NPY_SAVE_FOLDER = "d:/!private/Lord/git/cvuT_lampy/data/for_article/"
+NPY_SAVE_FOLDER = "g:/datasets/lamps/preprocessed/"
 
 if __name__ == '__main__':
 

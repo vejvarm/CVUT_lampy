@@ -3,11 +3,19 @@ class FLAGS:
     nlamps = 1  # for new X_li.npy files use 1, for old X.npy use 3
     naccs_per_lamp = 2
 
-    LAMPS_GRID = ["l1", "l2"]  # "l3"]
-    BIN_SIZE_GRID = [(8, ), ]  # (16, ), (32, ), (64, )]
-    THRESHOLD_GRID = [(0.01, ), ]  # (0.1, ), (1., ), (2, ), (4, )]
-    PERIOD_GRID = [1, ]  # 7, 14, 28]
-    VAR_SCALED_GRID = [True, ]  # False]
+    # LAMPS_GRID = ["l1", "l2", "l3"]  #
+    # BIN_SIZE_GRID = [(64, )]  #
+    # THRESHOLD_GRID = [(0.01, 0.1)]  #
+    # PERIOD_GRID = [1, 7, 14, 30]  #
+    # VAR_SCALED_GRID = [True]  #
+
+    TIMES_FACTOR = 1
+
+    LAMPS_GRID = ["l1", "l2", "l3"]
+    BIN_SIZE_GRID = [(64, )]
+    THRESHOLD_GRID = [(0.5, 1.), ]
+    PERIOD_GRID = [1, 7, 14]
+    VAR_SCALED_GRID = [True, ]
 
     preproc_default = {
         "fs": 1000,  # Hz
@@ -19,7 +27,7 @@ class FLAGS:
         "noise_f_rem": (1,),
         "noise_df_rem": (1,),
         "mov_filt_size": 10,
-        "rem_neg": True,
+        "rem_neg": False,
     }
 
     mat_field_names = {
@@ -29,7 +37,7 @@ class FLAGS:
         "WindSpeed": "WindSpeed",
     }
 
-    data_root = "b:/!Cloud/OneDrive - VŠCHT/CVUT_Lampy/data/"
+    data_root = "G:/datasets/lamps/"
     raw_folder = "raw"
     preprocessed_folder = "preprocessed"
     image_save_folder = "results/images"
@@ -39,18 +47,18 @@ class FLAGS:
                      "dataset": [""],
                      "period": "2months"
                      },
-        "validation": {"folder": "validace",
-                       "dataset": ["neporuseno", "poruseno"],
+        "validation": {"folder": "validation",
+                       "dataset": ["unbroken", "broken"],
                        "period": ""
                        },
-        "serialized": {"folder": "serialized",
+        "serialized": {"folder": "serialized_full",  # TODO: Change if needed ("serialized_full")
                        "dataset": [""],
                        "period": ""
                        }
     }
 
-    serialized = {"unbroken": 107,
-                  "broken": 93}  # TODO: Change if needed
+    serialized = {"unbroken": 107,  # 167,
+                  "broken": 93}  # 436 TODO: Change if needed
 
     lamps = {
         "l1": ("X_l1.npy", "y_l1.npy"),
@@ -60,7 +68,7 @@ class FLAGS:
 
     preprocessing = {
         "use_autocorr": True,
-        "rem_neg": True
+        "rem_neg": False  # works better than True
     }
 
     PSNR_csv_setup = {

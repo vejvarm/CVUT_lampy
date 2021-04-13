@@ -6,7 +6,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from bin.flags import FLAGS
-from bin.helpers import console_logger
+from bin.helpers import console_logger, plot_distributions_fn
 from bin.Preprocessor import Preprocessor
 from bin.Methods import M2
 
@@ -50,29 +50,6 @@ def linear_regression(y, x=None):
     A = np.vstack((x, np.ones(ndata))).T
     a, b = np.linalg.lstsq(A, y, rcond=None)[0]
     return a, b
-
-
-def plot_distributions_fn(distributions, save_path="../images/M2/binarized-spectra/"):
-    save_path = os.path.normpath(save_path)
-    os.makedirs(save_path, exist_ok=True)
-    for j, dist in enumerate((distributions, )):
-        for params, freqs, d in dist:
-            nrows = 1
-            ncols = 1
-            fig, axes = plt.subplots(nrows, ncols)
-            if nrows + ncols == 2:
-                axes = np.array([axes])
-            for i, ax in enumerate(axes.flatten()):
-                y_pos = np.arange(len(d[i, :]))
-                ax.bar(y_pos, d[i, :], align="center", width=0.9)
-                ax.set_xlabel("bin")
-                ax.set_ylabel("$psd_{bin}$")
-                ax.set_yscale("log")
-            fig.suptitle(f"Binarized spectrum | bin size: {params[0]} | threshold: {params[1]} |")
-            flnm = f"{save_path}/binarized_spectrum_bs-{params[0]}_th-{params[1]}"
-            plt.savefig(f"{flnm}.png", dpi=200)
-            plt.savefig(f"{flnm}.pdf")
-            plt.savefig(f"{flnm}.svg")
 
 
 if __name__ == "__main__":

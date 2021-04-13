@@ -3,6 +3,7 @@ import os
 from collections import Counter
 
 from bin.flags import FLAGS
+from bin.helpers import plot_distributions_fn
 from bin.Preprocessor import Preprocessor
 from bin.Methods import M2
 
@@ -14,6 +15,9 @@ from matplotlib import pyplot as plt
 
 FULL_IMAGE_SAVE_FOLDER = os.path.join(FLAGS.data_root, FLAGS.image_save_folder)
 PRINT_FILL_SIZE = 50
+
+PLOT_DISTRIBUTIONS = False
+
 
 def calc_periodic_best(ce, bin_sizes, thresholds, print_results=False):
     nperiods, nparams = ce.shape
@@ -66,8 +70,8 @@ if __name__ == "__main__":
 
     from_existing_file = True
 
-    # TODO: Make grid search for lamp, bin_sizes, thresholds and period
-    # TODO: Save and categorize resulting graphs
+    # DONE: Make grid search for lamp, bin_sizes, thresholds and period
+    # DONE: Save and categorize resulting graphs
 
     for lamp in FLAGS.LAMPS_GRID:
         # relative difference container
@@ -90,7 +94,6 @@ if __name__ == "__main__":
                         # multiscale params
                         # bin_sizes = (8, )
                         # thresholds = (0.01, )
-                        plot_distributions = False
 
                         if len(bin_sizes) * len(thresholds) == 1:
                             method_name = "CCE"
@@ -158,13 +161,30 @@ if __name__ == "__main__":
                         plt.grid()
 
                         # save the resulting plot
-                        flnm = os.path.join(FULL_IMAGE_SAVE_FOLDER, f"{method_name}_{lamp}_bs{bin_sizes}_th{thresholds}_per{period}_vs{var_scaled}")
+                        flnm = os.path.join(FULL_IMAGE_SAVE_FOLDER, f"{method_name}_{lamp}_bs{bin_sizes}_th{thresholds}_per{period:02d}_vs{var_scaled}")
                         plt.savefig(f"{flnm}.png", dpi=200)
                         plt.savefig(f"{flnm}.pdf")
                         plt.savefig(f"{flnm}.svg")
                         # close the figure
                         plt.close(fig)
                         # plt.show()
+
+                        # if plot distributions:
+                        if PLOT_DISTRIBUTIONS:
+                            os.makedirs(flnm, exist_ok=True)
+                            print("Plotting trained binarized distributions")
+                            plot_distributions_fn(m2.trained_distributions, flnm+"/trained")
+                            print("Plotting aggregate validation distributions")
+                            pth_valid_unbroken = os.path.join(root, FLAGS.paths["validation"]["folder"],
+                                                              FLAGS.paths["validation"]["dataset"][0])
+                            vd_unbroken = m2.get_multiscale_distributions(pth_valid_unbroken,
+                                                                          bin_sizes, thresholds)
+                            plot_distributions_fn(vd_unbroken, flnm + "/valid/unbroken")
+                            pth_valid_broken = os.path.join(root, FLAGS.paths["validation"]["folder"],
+                                                              FLAGS.paths["validation"]["dataset"][1])
+                            vd_broken = m2.get_multiscale_distributions(pth_valid_broken,
+                                                                        bin_sizes, thresholds)
+                            plot_distributions_fn(vd_broken, flnm+"/valid/broken")
 
                         print(" DONE ".center(PRINT_FILL_SIZE, "#")+"\n")
 

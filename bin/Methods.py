@@ -347,7 +347,7 @@ class M2(Method):
         :return: -sum(d1(x).log2(d2(x)))
         """
 
-        return -np.sum(d1*np.log2(d2))
+        return -FLAGS.TIMES_FACTOR*np.sum(d1*np.log2(d2))
 
 
     @staticmethod
@@ -389,13 +389,17 @@ class M2(Method):
         """ Calculate binarized values in bins scaled by softmax to probability distribution with sum of 1
 
         :param psd_bins: (3D array) psd array which is split to bins [:, nbins, bin_size]
-        :param threshold: (int) desired cutoff value for binarization
+        :param threshold: (float) desired cutoff value for binarization
         :return psd_binarized_softmaxed: (2D array) [:, nbins]
         """
-        psd_binarized = np.array(psd_bins > threshold, dtype=np.float32)
 
-        psd_binarized_sum = psd_binarized.sum(axis=-1)
-        psd_binarized_sum = (psd_binarized_sum - psd_binarized_sum.mean())/psd_binarized_sum.std()
+        psd_binarized_sum = psd_bins.sum(axis=-1)
+        min = psd_binarized_sum.min()
+        max = psd_binarized_sum.max()
+        psd_binarized_sum = (psd_binarized_sum - min)  # reset base to 0
+        psd_binarized_sum = np.array(psd_binarized_sum > threshold, dtype=np.float32)
+        # psd_binarized_sum = (psd_binarized_sum - psd_binarized_sum.mean())/psd_binarized_sum.std()
+        # print(psd_binarized_sum)
         psd_sum_of_exp = np.exp(psd_binarized_sum).sum(axis=-1)
 
         psd_binarized_softmaxed = np.exp(psd_binarized_sum)/np.expand_dims(psd_sum_of_exp, 1)
