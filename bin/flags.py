@@ -11,22 +11,22 @@ class FLAGS:
 
     TIMES_FACTOR = 1
 
-    LAMPS_GRID = ["l1", "l2", "l3"]
-    BIN_SIZE_GRID = [(64, )]
-    THRESHOLD_GRID = [(0.5, 1.), ]
-    PERIOD_GRID = [1, 7, 14]
+    LAMPS_GRID = ["l2", ]
+    BIN_SIZE_GRID = [(4, 8, 16), (64, )]
+    THRESHOLD_GRID = [(0.05, ), (0.2, )]
+    PERIOD_GRID = [1, 7]
     VAR_SCALED_GRID = [True, ]
 
     preproc_default = {
         "fs": 1000,  # Hz
-        "ns_per_hz": 10,
-        "freq_range": (0, 500),
+        "ns_per_hz": 1,
+        "freq_range": (80, 500),
         "tdf_order": 5,
-        "tdf_ranges": ((45, 55), (95, 105), (145, 155), (195, 205), (245, 255), (295, 305), (345, 355), (395, 405), (445, 455)),
-        "use_autocorr": True,
+        "tdf_ranges": ((95, 105), ),
+        "use_autocorr": False,
         "noise_f_rem": (1,),
         "noise_df_rem": (1,),
-        "mov_filt_size": 10,
+        "mov_filt_size": 1,
         "rem_neg": False,
     }
 
@@ -42,23 +42,25 @@ class FLAGS:
     preprocessed_folder = "preprocessed"
     image_save_folder = "results/images"
 
+    setting = "_no_autocorr"
+
     paths = {
         "training": {"folder": "training",
                      "dataset": [""],
-                     "period": "2months"
+                     "period": f"2months{setting}"
                      },
         "validation": {"folder": "validation",
-                       "dataset": ["unbroken", "broken"],
+                       "dataset": [f"unbroken{setting}", f"broken{setting}"],
                        "period": ""
                        },
-        "serialized": {"folder": "serialized_full",  # TODO: Change if needed ("serialized_full")
+        "serialized": {"folder": f"serialized{setting}",  # TODO: Change if needed ("serialized_full")
                        "dataset": [""],
                        "period": ""
                        }
     }
 
     serialized = {"unbroken": 107,  # 167,
-                  "broken": 93}  # 436 TODO: Change if needed
+                  "broken": 436}  # 93 TODO: Change if needed
 
     lamps = {
         "l1": ("X_l1.npy", "y_l1.npy"),

@@ -115,7 +115,7 @@ if __name__ == "__main__":
                         m2.train(paths[0], bin_sizes, thresholds)
 
                         # Calculate cross entropy of
-                        ce23 = m2.compare(paths_valid[0], period=period, print_results=False)  # compared with neporuseno2
+                        ce23 = m2.compare(paths_valid[0], period=period, print_results=False)
                         # print(ce2.shape)  # (nperiods, nbins*nthresholds)
 
                         # Find the highest cross-entropy for each day

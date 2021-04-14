@@ -242,14 +242,16 @@ class M1(Method):
 
 class M2(Method):
 
-    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, nmeas=144, var_scaled_PSD=False, from_preprocessed=False, lamp="l1"):
+    def __init__(self, preprocessor=Preprocessor(), from_existing_file=True, nmeas=144, var_scaled_PSD=False, from_preprocessed=False, lamp="l1", energy_leakage=0.9):
         super(M2, self).__init__(preprocessor, from_existing_file=from_existing_file, nmeas=nmeas, from_preprocessed=from_preprocessed, lamp=lamp)
 
         self.bin_sizes = None
         self.thresholds = None
         self.var_scaled_PSD = var_scaled_PSD
+        self.energy_leakage = energy_leakage
 
         self.trained_distributions = None
+        self.trained_energy = 0.
 
     def train(self, path, bin_sizes, thresholds):
         """ calculate binarized distributions of PSD from path for each combination of bin_size and threshold nd then save them for further use
@@ -263,7 +265,7 @@ class M2(Method):
         self.bin_sizes = bin_sizes
         self.thresholds = thresholds
 
-        self.trained_distributions = self.get_multiscale_distributions(path, self.bin_sizes, self.thresholds)
+        self.trained_distributions, self.trained_energy = self.get_multiscale_distributions(path, self.bin_sizes, self.thresholds)
         LOGGER.debug(f"trained_distributions.shape: {[td[2].shape for td in self.trained_distributions]}")
 
         print("Training complete!")
@@ -282,7 +284,7 @@ class M2(Method):
         if not self.trained_distributions:
             raise(ValueError, "Nejdříve je třeba metodu natrénovat (M2().train).")
 
-        valid_distributions = self.get_multiscale_distributions(path, self.bin_sizes, self.thresholds, period)
+        valid_distributions, valid_energies = self.get_multiscale_distributions(path, self.bin_sizes, self.thresholds, period)
 
         nperiods = len(valid_distributions)
         nbins = len(self.bin_sizes)
@@ -316,27 +318,43 @@ class M2(Method):
         LOGGER.debug(f"PSD.shape: {PSD.shape}")
 
         multiscale_distributions = list()
+        mean_energy_list = list()
 
-        for i, (mean, var) in enumerate(zip(PSD, PSD_var)):
+        for mean, var in zip(PSD, PSD_var):
             if self.var_scaled_PSD:
                 var = (var - var.min())/(var.max() - var.min())  # normalize to interval (0, 1)
                 mean = mean*var
 
             md = list()
+            energy_sum = 0.
+            i = 0
+            PSD_binarized_softmax = None
 
             # multiscale (grid search way)
             for bin_size in bin_sizes:
                 for threshold in thresholds:
-                    freq_bins, PSD_bins = self._split_to_bins(freqs, mean, bin_size)
+                    freq_bins, PSD_bins, energy = self._split_to_bins(freqs, mean, bin_size)
 
-                    freq_binarized_mean = freq_bins.mean(axis=-1)
-                    PSD_binarized_softmax = self._binarize_and_softmax(PSD_bins, threshold)
+                    if self.trained_energy and energy < self.trained_energy*self.energy_leakage:
+                        PSD_binarized_softmax = None
+                        break
+                    else:
+                        freq_binarized_mean = freq_bins.mean(axis=-1)
+                        PSD_binarized_softmax = self._binarize_and_softmax(PSD_bins, threshold)
 
-                    md.append([(bin_size, threshold), freq_binarized_mean, PSD_binarized_softmax])
+                        md.append([(bin_size, threshold), freq_binarized_mean, PSD_binarized_softmax])
+                        energy_sum += energy
+                        i += 1
 
-            multiscale_distributions.append(md)
+                if PSD_binarized_softmax is None:
+                    break
+            if energy_sum:
+                mean_energy_list.append(energy_sum/i)
+                multiscale_distributions.append(md)
+            else:
+                print("leak")
 
-        return multiscale_distributions if period else multiscale_distributions[0]
+        return (multiscale_distributions, mean_energy_list) if period else (multiscale_distributions[0], mean_energy_list[0])
 
     @staticmethod
     def _cross_entropy(d1, d2):
@@ -382,7 +400,9 @@ class M2(Method):
             psd_bins[:, i, :] = pbin
         LOGGER.debug(f"psd_bins.shape: {psd_bins.shape}")
 
-        return freq_bins, psd_bins
+        energy = psd_bins.sum()
+
+        return freq_bins, psd_bins, energy
 
     @staticmethod
     def _binarize_and_softmax(psd_bins, threshold):
@@ -392,12 +412,11 @@ class M2(Method):
         :param threshold: (float) desired cutoff value for binarization
         :return psd_binarized_softmaxed: (2D array) [:, nbins]
         """
-
         psd_binarized_sum = psd_bins.sum(axis=-1)
         min = psd_binarized_sum.min()
         max = psd_binarized_sum.max()
         psd_binarized_sum = (psd_binarized_sum - min)  # reset base to 0
-        psd_binarized_sum = np.array(psd_binarized_sum > threshold, dtype=np.float32)
+        # psd_binarized_sum = np.array(psd_binarized_sum > threshold, dtype=np.float32)
         # psd_binarized_sum = (psd_binarized_sum - psd_binarized_sum.mean())/psd_binarized_sum.std()
         # print(psd_binarized_sum)
         psd_sum_of_exp = np.exp(psd_binarized_sum).sum(axis=-1)
