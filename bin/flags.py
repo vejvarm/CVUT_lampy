@@ -26,11 +26,11 @@ class FLAGS:
         "freq_range": (0, 256),
         "tdf_order": 5,
         "tdf_ranges": ((95, 105), ),
-        "use_autocorr": False,
+        "use_autocorr": True,
         "noise_f_rem": (1,),
         "noise_df_rem": (1,),
         "mov_filt_size": 1,
-        "rem_neg": False,
+        "rem_neg": True,
     }
 
     mat_field_names = {
