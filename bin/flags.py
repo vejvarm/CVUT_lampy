@@ -1,3 +1,6 @@
+from os import curdir
+
+
 class FLAGS:
     naccs = 6
     nlamps = 1  # for new X_li.npy files use 1, for old X.npy use 3
@@ -20,7 +23,7 @@ class FLAGS:
     preproc_default = {
         "fs": 1000,  # Hz
         "ns_per_hz": 1,
-        "freq_range": (80, 500),
+        "freq_range": (0, 256),
         "tdf_order": 5,
         "tdf_ranges": ((95, 105), ),
         "use_autocorr": False,
@@ -37,7 +40,7 @@ class FLAGS:
         "WindSpeed": "WindSpeed",
     }
 
-    data_root = "G:/datasets/lamps/"
+    data_root = curdir
     raw_folder = "raw"
     preprocessed_folder = "preprocessed"
     image_save_folder = "results/images"
