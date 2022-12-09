@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 
 from bin.Preprocessor import Preprocessor
-# from helpers import find_top_peaks, calc_centre_of_mass
+from bin.helpers import find_top_peaks, calc_centre_of_mass
 
 
 if __name__ == '__main__':

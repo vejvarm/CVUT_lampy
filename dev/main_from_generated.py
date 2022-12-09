@@ -55,16 +55,17 @@ def linear_regression(y, x=None):
 if __name__ == "__main__":
     # DATA LOADING SETTINGS
     nrepeats = 1
-    signal_amps = [(0.75, 1)]
-    noise_amps = [(0.0, 0.5)]
+    signal_amps = [(0.5, 1)]
+    noise_amps = [(0.0, 0.2)]
     root = "../data/for_article/generated"
+    noise_subfolder = ""
 
     # PARAMS
     from_existing_file = True
 
     # multiscale params
-    bin_sizes = (48, )
-    thresholds = (0.5, )
+    bin_sizes = (48, 128)
+    thresholds = (0.5, 2.5)
     plot_distributions = True
 
     if len(bin_sizes)*len(thresholds) == 1:
@@ -95,8 +96,8 @@ if __name__ == "__main__":
     for idx in range(nrepeats):
         for s_amp in signal_amps:
             for n_amp in noise_amps:
-                path_train = {"folder": f"{root}/train", "name": f"X{idx}_sAmp{s_amp}_nAmp{n_amp}.npy"}
-                path_test = {"folder": f"{root}/test", "name": f"X{idx}_sAmp{s_amp}_nAmp{n_amp}.npy"}
+                path_train = {"folder": f"{root}/{noise_subfolder}/train", "name": f"X{idx}_sAmp{s_amp}_nAmp{n_amp}.npy"}
+                path_test = {"folder": f"{root}/{noise_subfolder}/test", "name": f"X{idx}_sAmp{s_amp}_nAmp{n_amp}.npy"}
 
                 # initialize M2
                 m2 = M2(preprocessor, from_existing_file=from_existing_file, nmeas=nmeas)
@@ -167,8 +168,8 @@ if __name__ == "__main__":
                     LOGGER.info("Plotting validation binarized distributions")
                     valid_distributions = m2.get_multiscale_distributions(os.path.join(*list(path_test.values())),
                                                                             bin_sizes, thresholds, period)
-                    print(valid_distributions)
-                    plot_distributions_fn(valid_distributions[-1], "../images/M2/binarized-spectra/valid/")
+                    # print(f"valid distributions: {valid_distributions[-1]}")
+                    # plot_distributions_fn(valid_distributions[-1], "../images/M2/binarized-spectra/valid/")
     LOGGER.info(f"Adding dα column to dfPSNR")
     dfPSNR["da (%)"] = pd.Series(rel_diff_list, index=dfPSNR.index)
     LOGGER.info(f"Saving updated dfPSNR")

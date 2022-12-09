@@ -69,12 +69,13 @@ def zero_out_freqs_pattern(x, fs, freqs=(50, 100, 200)):
 if __name__ == '__main__':
     nrepeats = 1
     signal_amps = [(0.5, 1)]
-    noise_amps = [(0, 0.5)]
+    noise_amps = [(0.0, 0.2)]
 
     fs = 512
-    nfft = 5120
+    ns_per_hz = 10
+    nfft = fs*ns_per_hz
     nsamples = 15360
-    root = "./data/for_article/generated"
+    root = "../data/for_article/generated"
     plot_exts = [".pdf", ".svg"]
 
     dPSNR = {"episode": [], "signal_amp_max": [], "noise_amp_max": [], "train_PSNR (dB)": [], "test_PSNR (dB)": []}
@@ -135,7 +136,7 @@ if __name__ == '__main__':
                 x_test = np.vstack([x_test_un, x_test_br])
 
                 LOGGER.info("Preprocessing signals to psd using Preprocessor with default values.")
-                p = Preprocessor()
+                p = Preprocessor(fs=fs, ns_per_hz=ns_per_hz)
                 freq_train, psd_train = p.simple_preprocess(x_train.T)
                 freq_test, psd_test = p.simple_preprocess(x_test.T)
                 freq_test_un, psd_test_un = p.simple_preprocess(x_test_un.T)
@@ -257,7 +258,7 @@ if __name__ == '__main__':
                     fig, ax = plt.subplots(1, 3)
                     fig.set_size_inches(6.5, 2.5)
                     for j in range(3):
-                        plotter(t, x_train[j, :], ax[j], title=f"{j}", xlabel="time (s)")
+                        plotter(t, x_train[j, :], ax[j], title=f"{j%3}", xlabel="time (s)")
                     plt.suptitle("Baseline signals")
                     ax[0].set_ylabel("$y_b$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -269,7 +270,7 @@ if __name__ == '__main__':
                     fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(t, x_test_un[j, :], ax[j], title=f"{j}", xlabel="time (s)")
+                        plotter(t, x_test_un[j, :], ax[j], title=f"{j%3}", xlabel="time (s)")
                     plt.suptitle("Unshifted signals")
                     ax[0].set_ylabel("$y_{u1}$")
                     ax[3].set_ylabel("$y_{u2}$")
@@ -282,7 +283,7 @@ if __name__ == '__main__':
                     fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(t, x_test_br[j, :], ax[j], title=f"{j}", xlabel="time (s)")
+                        plotter(t, x_test_br[j, :], ax[j], title=f"{j%3}", xlabel="time (s)")
                     plt.suptitle("Shifted signals")
                     ax[0].set_ylabel("$y_{s1}$")
                     ax[3].set_ylabel("$y_{s2}$")
@@ -302,7 +303,7 @@ if __name__ == '__main__':
                     fig, ax = plt.subplots(1, 3)
                     fig.set_size_inches(6.5, 2.5)
                     for j in range(3):
-                        plotter(freq_train, X_train[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                        plotter(freq_train, X_train[j, :], ax[j], title=f"{j%3}", xlabel="frequency (Hz)")
                     plt.suptitle("Baseline FFTs")
                     ax[0].set_ylabel("$Y_b$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -314,7 +315,7 @@ if __name__ == '__main__':
                     fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(freq_test_un, X_test_un[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                        plotter(freq_test_un, X_test_un[j, :], ax[j], title=f"{j%3}", xlabel="frequency (Hz)")
                     plt.suptitle("Unshifted FFTs")
                     ax[0].set_ylabel("$Y_{u1}$")
                     ax[3].set_ylabel("$Y_{u2}$")
@@ -327,7 +328,7 @@ if __name__ == '__main__':
                     fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(freq_test_br, X_test_br[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                        plotter(freq_test_br, X_test_br[j, :], ax[j], title=f"{j%3}", xlabel="frequency (Hz)")
                     plt.suptitle("Shifted FFTs")
                     ax[0].set_ylabel("$Y_{s1}$")
                     ax[3].set_ylabel("$Y_{s2}$")
@@ -347,7 +348,7 @@ if __name__ == '__main__':
                     fig, ax = plt.subplots(1, 3)
                     fig.set_size_inches(6.5, 2.5)
                     for j in range(3):
-                        plotter(freq_train, psd_train[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                        plotter(freq_train, psd_train[j, :], ax[j], title=f"{j%3}", xlabel="frequency (Hz)")
                     plt.suptitle("Baseline PSDs")
                     ax[0].set_ylabel("$PSD_b$")
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -359,7 +360,7 @@ if __name__ == '__main__':
                     fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(freq_test_un, psd_test_un[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                        plotter(freq_test_un, psd_test_un[j, :], ax[j], title=f"{j%3}", xlabel="frequency (Hz)")
                     plt.suptitle("Unshifted PSDs")
                     ax[0].set_ylabel("$PSD_{u1}$")
                     ax[3].set_ylabel("$PSD_{u2}$")
@@ -372,7 +373,7 @@ if __name__ == '__main__':
                     fig.set_size_inches(6.5, 4.5)
                     ax = ax.flatten()
                     for j in range(6):
-                        plotter(freq_test_br, psd_test_br[j, :], ax[j], title=f"{j}", xlabel="frequency (Hz)")
+                        plotter(freq_test_br, psd_test_br[j, :], ax[j], title=f"{j%3}", xlabel="frequency (Hz)")
                     plt.suptitle("Shifted PSDs")
                     ax[0].set_ylabel("$PSD_{s1}$")
                     ax[3].set_ylabel("$PSD_{s2}$")

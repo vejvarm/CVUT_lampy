@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -7,11 +9,14 @@ from bin.Preprocessor import Preprocessor
 
 if __name__ == "__main__":
     savefigs = True
+    root = Path("../data/for_article/generated/example")
+    root.mkdir(exist_ok=True)
 
     nsamples = 15360  # počet časových vzorků signálu
     nsignals = 1 # počet signálů (počet měření za den)
     fs = 512  # vzorkovací frekvence
-    nfft = 5120  # délka fourierovy transformace
+    ns_per_hz = 1  # pocet vzorku na hz pri FFT
+    nfft = fs*ns_per_hz  # délka fourierovy transformace
 
     # parametry signálu
     fvs = np.array([5., 10., 30., 80., 110.])  # vlastní frekvence
@@ -46,7 +51,7 @@ if __name__ == "__main__":
     XN = abs(np.fft.fft(xn, nfft))[:, :nfft//2]
 
     # Aplikace preprocessoru
-    p = Preprocessor(use_autocorr=True, rem_neg=False)
+    p = Preprocessor(fs=fs, ns_per_hz=ns_per_hz, use_autocorr=True, rem_neg=False)
     freq_vals, psd = p.simple_preprocess(xn.T)
 
     # Vykreslení výsledků
@@ -58,8 +63,8 @@ if __name__ == "__main__":
     plotter(t, xn.T, ax[2], title="signal + noise", xlabel="time (s)")
     if savefigs:
         plt.tight_layout()
-        plt.savefig("../data/generated/example/01_signals.pdf")
-        plt.savefig("../data/generated/example/01_signals.svg")
+        plt.savefig(root.joinpath("01_signals.pdf"))
+        plt.savefig(root.joinpath("01_signals.svg"))
 
     # FFT signálů
     fss = np.arange(nfft//2)/nfft*fs
@@ -69,13 +74,13 @@ if __name__ == "__main__":
     plotter(fss, XN.T, ax[2], title="FFT of signal + noise", xlabel="Frequency (Hz)", ylabel="abs(fft)")
     if savefigs:
         plt.tight_layout()
-        plt.savefig("../data/generated/example/02_ffts.pdf")
-        plt.savefig("../data/generated/example/02_ffts.svg")
+        plt.savefig(root.joinpath("02_ffts.pdf"))
+        plt.savefig(root.joinpath("02_ffts.svg"))
 
     # Preprocessing zašumělých signálů a jejich průměr
     plotter(freq_vals, psd.mean(axis=-1), title="Mean preprocessed spectrum", xlabel="Frequency (Hz)", ylabel="psd")
     if savefigs:
         plt.tight_layout()
-        plt.savefig("../data/generated/example/03_psd.pdf")
-        plt.savefig("../data/generated/example/03_psd.svg")
+        plt.savefig(root.joinpath("03_psd.pdf"))
+        plt.savefig(root.joinpath("03_psd.svg"))
     plt.show()

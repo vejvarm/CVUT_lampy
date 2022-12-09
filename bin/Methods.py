@@ -352,6 +352,8 @@ class M2(Method):
                 mean_energy_list.append(energy_sum/i)
                 multiscale_distributions.append(md)
             else:
+                mean_energy_list.append(energy_sum)
+                multiscale_distributions.append(md)
                 print("leak")
 
         return (multiscale_distributions, mean_energy_list) if period else (multiscale_distributions[0], mean_energy_list[0])

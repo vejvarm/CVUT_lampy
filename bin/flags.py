@@ -21,8 +21,8 @@ class FLAGS:
     VAR_SCALED_GRID = [True, ]
 
     preproc_default = {
-        "fs": 1000,  # Hz
-        "ns_per_hz": 1,
+        "fs": 512,  # Hz
+        "ns_per_hz": 10,
         "freq_range": (0, 256),
         "tdf_order": 5,
         "tdf_ranges": ((95, 105), ),
@@ -72,7 +72,7 @@ class FLAGS:
     }
 
     preprocessing = {
-        "use_autocorr": True,
+        "use_autocorr": False,
         "rem_neg": False  # works better than True
     }
 
