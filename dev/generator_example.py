@@ -7,9 +7,12 @@ from bin.helpers import plotter
 from bin.Generator import Generator
 from bin.Preprocessor import Preprocessor
 
+import logging
+
 if __name__ == "__main__":
     savefigs = True
     root = Path("../data/for_article/generated/example")
+    loglevel = logging.DEBUG
     root.mkdir(exist_ok=True)
 
     nsamples = 15360  # počet časových vzorků signálu
@@ -51,7 +54,7 @@ if __name__ == "__main__":
     XN = abs(np.fft.fft(xn, nfft))[:, :nfft//2]
 
     # Aplikace preprocessoru
-    p = Preprocessor(fs=fs, ns_per_hz=ns_per_hz, use_autocorr=True, rem_neg=False)
+    p = Preprocessor(fs=fs, ns_per_hz=ns_per_hz, use_autocorr=True, rem_neg=False, loglevel=loglevel)
     freq_vals, psd = p.simple_preprocess(xn.T)
 
     # Vykreslení výsledků

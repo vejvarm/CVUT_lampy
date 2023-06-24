@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from copy import deepcopy
@@ -13,7 +14,6 @@ from tqdm import tqdm
 from bin.flags import FLAGS
 from bin.helpers import console_logger
 
-LOGGER = console_logger(__name__, "WARNING")
 
 def _remove_negative(psd_arr):
     """
@@ -36,6 +36,7 @@ class Preprocessor:
     noise_df_rem_default = FLAGS.preproc_default["noise_df_rem"]
     mov_filt_size_default = FLAGS.preproc_default["mov_filt_size"]
     rem_neg_default = FLAGS.preproc_default["rem_neg"]
+    loglevel_default = logging.WARNING
 
     def __init__(self,
                  fs=fs_default,
@@ -47,7 +48,8 @@ class Preprocessor:
                  noise_f_rem=noise_f_rem_default,
                  noise_df_rem=noise_df_rem_default,
                  mov_filt_size=mov_filt_size_default,
-                 rem_neg=rem_neg_default):
+                 rem_neg=rem_neg_default,
+                 loglevel=loglevel_default):
         """
 
         :param fs: (int) sampling frequency of the acquisition
@@ -60,6 +62,7 @@ class Preprocessor:
         :param noise_df_rem: (list/tuple) range around f_rem that should also be removed
         :param mov_filt_size: (int) length of the rectangular filter for moving average application
         :param rem_neg: (bool) if True, remove negative values after the final preprocessing stage
+        :param loglevel: (int) sets the level of logging for class logger
         """
         self.fs = fs
         self.ns_per_hz = ns_per_hz
@@ -71,6 +74,7 @@ class Preprocessor:
         self.noise_df_rem = noise_df_rem
         self.mov_filt_size = mov_filt_size
         self.rem_neg = rem_neg
+        self.logger = console_logger(__name__, loglevel)
 
         # calculate numerators and denominators of time domain frequency filters
         self.nums, self.denoms = self._make_bandstop_filters()
@@ -182,32 +186,32 @@ class Preprocessor:
         :return: preprocessed psd
         """
 
-        LOGGER.info(f"_calc_zscore")
+        self.logger.info(f"_calc_zscore")
         arr = self._calc_zscore(arr)
-        LOGGER.debug(f"arr[0]: {arr[0]}")
-        LOGGER.info(f"_apply_time_domain_filters")
+        self.logger.debug(f"arr[0]: {arr[0]}")
+        self.logger.info(f"_apply_time_domain_filters")
         arr = self._apply_time_domain_filters(arr)
-        LOGGER.debug(f"arr[0]: {arr[0]}")
+        self.logger.debug(f"arr[0]: {arr[0]}")
         if self.use_autocorr:
-            LOGGER.info(f"_autocorr")
+            self.logger.info(f"_autocorr")
             arr = self._autocorr(arr)
-            LOGGER.debug(f"arr[0]: {arr[0]}")
-        LOGGER.info(f"_calc_psd")
+            self.logger.debug(f"arr[0]: {arr[0]}")
+        self.logger.info(f"_calc_psd")
         freq_vals, psd = self._calc_psd(arr)
-        LOGGER.debug(f"psd[0]: {psd[0]}")
-        LOGGER.info(f"_psd_z_score")
+        self.logger.debug(f"psd[0]: {psd[0]}")
+        self.logger.info(f"_psd_z_score")
         psd = (psd - psd.mean()) / psd.std()
-        LOGGER.debug(f"psd[0]: {psd[0]}")
-        LOGGER.info(f"_coarse_grain")
+        self.logger.debug(f"psd[0]: {psd[0]}")
+        self.logger.info(f"_coarse_grain")
         psd = self._coarse_grain(psd)
-        LOGGER.debug(f"psd[0]: {psd[0]}")
-        LOGGER.info(f"_detrend")
+        self.logger.debug(f"psd[0]: {psd[0]}")
+        self.logger.info(f"_detrend")
         psd = self._detrend(freq_vals, psd)
-        LOGGER.debug(f"psd[0]: {psd[0]}")
+        self.logger.debug(f"psd[0]: {psd[0]}")
         if self.rem_neg:
-            LOGGER.info(f"_remove_negative")
+            self.logger.info(f"_remove_negative")
             psd = self._remove_negative(psd)
-            LOGGER.debug(f"psd[0]: {psd[0]}")
+            self.logger.debug(f"psd[0]: {psd[0]}")
 
         return freq_vals, psd
 
@@ -617,7 +621,7 @@ if __name__ == '__main__':
     p = Preprocessor(use_autocorr=autocorr, rem_neg=rem_neg)
 
     freqs, psd = p.run(["B:/!Cloud/OneDrive - VŠCHT/CVUT_Lampy/data/raw/neporuseno/20180810_Acc_1000.mat"], return_as="ndarray",
-                       plot_semiresults=plot_semiresults, every=every, nmeas=nmeas, savefolder=plot_save_folder)
+                       plot_semiresults=plot_semiresults, every=every, nmeas=nmeas, plot_savefolder=plot_save_folder)
 
 
     time, norm_acc = p.semiresults["01_norm"][acc_idx]
